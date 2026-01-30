@@ -1,0 +1,12 @@
+ <TextInput placeholder="Full Name" placeholderTextColor="#444" value={form.name} onChangeText={(t) => setForm({...form, name: t})} className="bg-[#121212] text-white p-3 rounded-lg mb-3" />
+        
+        <View className="flex-row gap-2 mb-3">
+          <TextInput placeholder="Course" placeholderTextColor="#444" value={form.course} onChangeText={(t) => setForm({...form, course: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+          <TextInput placeholder="Year" placeholderTextColor="#444" value={form.year} onChangeText={(t) => setForm({...form, year: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+          <TextInput placeholder="Block" placeholderTextColor="#444" value={form.block} onChangeText={(t) => setForm({...form, block: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+        </View>
+        <View className="flex-row gap-2 mb-3">
+          <TextInput placeholder="Age" placeholderTextColor="#444" value={form.age} onChangeText={(t) => setForm({...form, age: t})} keyboardType="numeric" className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+          <TextInput placeholder="Gender" placeholderTextColor="#444" value={form.gender} onChangeText={(t) => setForm({...form, gender: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+        </View>
+        <TextInput placeholder="Achievements & Background" placeholderTextColor="#444" value={form.background} onChangeText={(t) => setForm({...form, background: t})} multiline className="bg-[#121212] text-white p-3 rounded-lg mb-4 h-20" />
