@@ -1,2 +1,4 @@
-fullname,studentId,email,password,age,gender,year,block
-jzlenko,2021001,jzlenko@example.com,pass123,20,Male,3rd,A
+fullname,email,studentId,password,age,gender
+John Doe,john.doe@school.edu,2024-001,Pass123!,20,Male
+Jane Smith,jane.smith@school.edu,2024-002,Secure456,19,Female
+Alex Reed,alex.reed@school.edu,2024-003,,21,Other

@@ -164,9 +164,6 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
       </View>
 
       {/* CSV IMPORT */}
-      <TouchableOpacity onPress={handleImportCSV} className="bg-blue-600/20 border border-blue-600/40 p-4 rounded-2xl mb-6 items-center flex-row justify-center">
-        <Text className="text-blue-400 font-bold">BULK IMPORT VIA CSV</Text>
-      </TouchableOpacity>
 
       {/* SEARCH BAR */}
       <TextInput placeholder="Search students..." placeholderTextColor="#444" onChangeText={setSearchQuery} className="bg-[#1e1e1e] text-white p-4 rounded-xl border border-gray-800 mb-4" />
@@ -197,7 +194,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
               placeholder="e.g. Duplicate account, Transferred..." 
               placeholderTextColor="#444" 
               value={removalReason} 
-              onChangeText={setRemovalReason}
+              onChangeText={setRemovalReason}                 
               multiline
               className="bg-[#121212] text-white p-4 rounded-xl mb-6 border border-gray-800 h-24"
             />

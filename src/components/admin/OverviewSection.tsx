@@ -231,6 +231,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
                 decimalPlaces: 0,
               }}
               style={{ borderRadius: 16 }}
+
             />
           </View>
         );

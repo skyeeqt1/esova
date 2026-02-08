@@ -288,6 +288,7 @@ const VoterScreen = ({ navigation }: any) => {
             <Text className="text-white text-2xl font-bold mt-4 text-center">{viewingCandidate?.name}</Text>
             <Text className="text-[#f1c40f] text-center font-bold mb-1 text-xs uppercase tracking-widest">{viewingCandidate?.position}</Text>
             <Text className="text-gray-400 text-[10px] uppercase text-center mb-4">{viewingCandidate?.course} • Year {viewingCandidate?.year}</Text>
+            <Text className="text-gray-500 text-[10px] italic text-center mb-2">Background & Achievements</Text>
             <Text className="text-gray-300 text-sm leading-5">{viewingCandidate?.background || "No platform information provided."}</Text>
             <TouchableOpacity onPress={() => setViewingCandidate(null)} className="mt-8 bg-[#f1c40f] p-4 rounded-xl items-center">
               <Text className="text-black font-black">CLOSE</Text>

@@ -136,8 +136,28 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
           <Text className="text-[#00b894] text-[10px] font-bold mt-2 uppercase">Tap to Upload Photo</Text>
         </TouchableOpacity>
         
-         <TextInput placeholder="Full Name" placeholderTextColor="#444" value={form.name} onChangeText={(t) => setForm({...form, name: t})} className="bg-[#121212] text-white p-3 rounded-lg mb-3" />
+        <TextInput placeholder="Full Name" placeholderTextColor="#444" value={form.name} onChangeText={(t) => setForm({...form, name: t})} className="bg-[#121212] text-white p-3 rounded-lg mb-3" />
         
+        {/* ADDED POSITION SELECTION HERE */}
+        <Text className="text-gray-500 text-[10px] uppercase font-bold mb-2 ml-1">Select Position</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-4">
+          {POSITIONS.map((pos: string) => (
+            <TouchableOpacity 
+              key={pos} 
+              onPress={() => setForm({...form, position: pos})}
+              className={`mr-2 px-4 py-2 rounded-full border ${
+                form.position === pos 
+                  ? 'bg-[#00b894] border-[#00b894]' 
+                  : 'bg-[#121212] border-gray-800'
+              }`}
+            >
+              <Text className={`text-[10px] font-bold ${form.position === pos ? 'text-black' : 'text-gray-400'}`}>
+                {pos.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <View className="flex-row gap-2 mb-3">
           <TextInput placeholder="Course" placeholderTextColor="#444" value={form.course} onChangeText={(t) => setForm({...form, course: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
           <TextInput placeholder="Year" placeholderTextColor="#444" value={form.year} onChangeText={(t) => setForm({...form, year: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
