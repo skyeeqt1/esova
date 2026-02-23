@@ -20,6 +20,7 @@ const VoterScreen = ({ navigation }: any) => {
   const [showReceiptOverride, setShowReceiptOverride] = useState(false);
   const [electionSettings, setElectionSettings] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("");
+  const [showTermsModal, setShowTermsModal] = useState(true);
 
   useEffect(() => {
     const userId = auth.currentUser?.uid;
@@ -111,6 +112,84 @@ const VoterScreen = ({ navigation }: any) => {
       <ActivityIndicator size="large" color="#f1c40f" />
     </View>
   );
+
+  // TERMS AND CONDITIONS / INSTRUCTIONS SCREEN (Shown before voting)
+  if (showTermsModal && !isEnded && !userData?.hasVoted) {
+    return (
+      <ImageBackground source={require("../img/tg.jpg")} resizeMode="cover" className="flex-1">
+        <View className="flex-1 bg-black/80 p-6 justify-center items-center">
+          <View className="bg-[#1e1e1e] rounded-3xl border border-[#f1c40f] p-6 w-full max-w-md">
+            <View className="items-center mb-4">
+              <View className="bg-white rounded-full border-2 border-[#f1c40f] mb-4">
+                <Image
+                  source={require("../img/escrlogo.png")}
+                  className="w-24 h-24"
+                  resizeMode="contain"
+                />
+              </View>
+              <Text className="text-[#f1c40f] text-2xl font-black italic">WELCOME, VOTER!</Text>
+              <Text className="text-white text-sm font-bold mt-2">Hello, {userData?.name}!</Text>
+              <Text className="text-gray-500 text-xs">ID: {userData?.studentId}</Text>
+            </View>
+
+            <View className="border-t border-b border-gray-800 py-4 mb-4">
+              <Text className="text-[#f1c40f] text-lg font-black italic mb-3">VOTING INSTRUCTIONS</Text>
+              <View className="space-y-2">
+                <View className="flex-row items-start">
+                  <Text className="text-[#f1c40f] font-bold mr-2">1.</Text>
+                  <Text className="text-gray-300 text-sm">Review all candidates for each position carefully.</Text>
+                </View>
+                <View className="flex-row items-start">
+                  <Text className="text-[#f1c40f] font-bold mr-2">2.</Text>
+                  <Text className="text-gray-300 text-sm">Tap on a candidate to select your vote for each position.</Text>
+                </View>
+                <View className="flex-row items-start">
+                  <Text className="text-[#f1c40f] font-bold mr-2">3.</Text>
+                  <Text className="text-gray-300 text-sm">You must select a candidate for ALL positions to proceed.</Text>
+                </View>
+                <View className="flex-row items-start">
+                  <Text className="text-[#f1c40f] font-bold mr-2">4.</Text>
+                  <Text className="text-gray-300 text-sm">Review your ballot before submitting.</Text>
+                </View>
+                <View className="flex-row items-start">
+                  <Text className="text-[#f1c40f] font-bold mr-2">5.</Text>
+                  <Text className="text-gray-300 text-sm">Once submitted, your vote cannot be changed.</Text>
+                </View>
+              </View>
+            </View>
+
+            <View className="bg-black/50 rounded-xl p-4 mb-6">
+              <Text className="text-[#f1c40f] text-sm font-black italic mb-2">TERMS AND CONDITIONS</Text>
+              <ScrollView style={{maxHeight: 150}}>
+                <Text className="text-gray-400 text-xs leading-4">
+                  • By proceeding with this vote, you acknowledge that your selection is final and cannot be modified after submission.{"\n"}
+                  • You certify that you are an eligible voter and have the right to participate in this election.{"\n"}
+                  • All votes are confidential and will be counted anonymously.{"\n"}
+                  • Any attempt to manipulate or disrupt the voting process is strictly prohibited.{"\n"}
+                  • The election administrators reserve the right to invalidate any vote suspected of being fraudulent.{"\n"}
+                  • By casting your vote, you agree to abide by all election rules and regulations.
+                </Text>
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setShowTermsModal(false)}
+              className="bg-[#f1c40f] p-4 rounded-xl border-b-4 border-yellow-700"
+            >
+              <Text className="text-black text-center font-black text-lg uppercase italic">I Accept - Proceed to Vote</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={handleLogout}
+              className="mt-4 p-4 rounded-xl border border-gray-800"
+            >
+              <Text className="text-red-500 text-center font-bold text-sm">Decline & Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ImageBackground>
+    );
+  }
 
   if (!isStarted) return (
     <View className="flex-1 bg-black justify-center items-center p-10">
