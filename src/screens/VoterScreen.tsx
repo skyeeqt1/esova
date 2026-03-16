@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TouchableOpacity, ScrollView, Image, 
-  Alert, ActivityIndicator, ImageBackground, Modal 
+  Alert, ActivityIndicator, Modal 
 } from 'react-native';
 import { db, auth } from '../config/firebase';
 import { collection, onSnapshot, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
@@ -116,8 +116,8 @@ const VoterScreen = ({ navigation }: any) => {
   // TERMS AND CONDITIONS / INSTRUCTIONS SCREEN (Shown before voting)
   if (showTermsModal && !isEnded && !userData?.hasVoted) {
     return (
-      <ImageBackground source={require("../img/tg.jpg")} resizeMode="cover" className="flex-1">
-        <View className="flex-1 bg-black/80 p-6 justify-center items-center">
+      <View className="flex-1 bg-[#1a1a1a]">
+        <View className="flex-1 bg-black/80  justify-center items-center">
           <View className="bg-[#1e1e1e] rounded-3xl border border-[#f1c40f] p-6 w-full max-w-md">
             <View className="items-center mb-4">
               <View className="bg-white rounded-full border-2 border-[#f1c40f] mb-4">
@@ -187,7 +187,7 @@ const VoterScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
         </View>
-      </ImageBackground>
+      </View>
     );
   }
 
@@ -216,16 +216,17 @@ const VoterScreen = ({ navigation }: any) => {
   );
 
   return (
-    <ImageBackground source={require("../img/tg.jpg")} resizeMode="cover" className="flex-1">
-      <View className="flex-1 bg-black/70">
+    <View className="flex-1 bg-[#1a1a1a]">
+        <View className="flex-1">
         
         {/* HEADER BAR */}
         <View className="bg-black pt-12 pb-4 px-6 border-b-2 border-[#f1c40f] flex-row justify-between items-center">
           <View>
-            <Text className="text-[#f1c40f] font-black text-xl italic tracking-tighter">ESOVA</Text>
-            <Text className="text-white text-[7px] tracking-[1px] uppercase opacity-60">
-              {isEnded ? "SESSION CLOSED" : `TIME LEFT: ${timeLeft}`}
+            <Text className="text-[#f1c40f] font-black text-xl italic tracking-tighter">E-SOVA</Text>
+            <Text className="text-white text-[10px] tracking-[1px] uppercase opacity-60">
+              {isEnded ? "SESSION" : `TIME LEFT`}
             </Text>
+            <Text className="text-[#e74c3c] font-bold"> {timeLeft}</Text>
           </View>
           <View className="bg-white rounded-full border-2 border-[#f1c40f] items-center justify-center">
             <Image source={require("../img/escrlogo.png")} className="w-20 h-20" resizeMode="contain" />
@@ -375,7 +376,7 @@ const VoterScreen = ({ navigation }: any) => {
           </View>
         </View>
       </Modal>
-    </ImageBackground>
+    </View>
   );
 };
 
