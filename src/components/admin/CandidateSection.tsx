@@ -22,7 +22,7 @@ interface Props {
   onRefresh?: () => void;
 }
 
-export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, setIsProcessing, refreshData }: any) => {
+export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, setIsProcessing, refreshData, adminEmail }: any) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -130,6 +130,7 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
           target_name: form.name,
           target_id: form.position,
           reason: `Updated candidate details - Course: ${form.course}, Year: ${form.year}`,
+          admin_email: adminEmail,
           timestamp: new Date().toISOString(),
         });
         
@@ -158,6 +159,7 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
           target_name: form.name,
           target_id: form.position,
           reason: `New candidate registered - Course: ${form.course}, Year: ${form.year}`,
+          admin_email: adminEmail,
           timestamp: new Date().toISOString(),
         });
         

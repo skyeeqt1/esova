@@ -14,7 +14,7 @@ interface FilePickerResult {
   canceled: boolean;
 }
 
-export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProcessing, refreshData }: any) => {
+export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProcessing, refreshData, adminEmail }: any) => {
   const navigation = useNavigation();
   
   // --- FORM STATES ---
@@ -84,6 +84,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
         target_name: voterName.trim(),
         target_id: voterID.trim(),
         reason: `Student registered - Email: ${voterEmail.toLowerCase().trim()}`,
+        admin_email: adminEmail,
         timestamp: new Date().toISOString(),
       });
       
@@ -132,6 +133,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
         target_name: voterToRemove.name,
         target_id: voterToRemove.student_id,
         reason: removalReason,
+        admin_email: adminEmail,
         timestamp: new Date().toISOString(),
       });
 
@@ -139,14 +141,21 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
         console.error('Log error:', logError);
       }
 
-      // 2. Perform the actual deletion
-      await handleDeleteItem("users", voterToRemove.id);
+      // 2. Perform the actual deletion (pass extraData to skip duplicate confirmation)
+      await handleDeleteItem("users", voterToRemove.id, { 
+        name: voterToRemove.name, 
+        studentId: voterToRemove.student_id, 
+        reason: removalReason 
+      });
+      
+      // Refresh the voter list
+      if (refreshData) {
+        await refreshData();
+      }
       
       setIsRemoveModalVisible(false);
       setVoterToRemove(null);
       setRemovalReason('');
-      
-      Platform.OS === 'web' ? alert("Removed successfully") : Alert.alert("Success", "Voter removed.");
     } catch (error) {
       console.error(error);
     }
@@ -196,6 +205,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
             target_name: `${records.length} students`,
             target_id: "BULK_IMPORT",
             reason: `Bulk import from CSV file`,
+            admin_email: adminEmail,
             timestamp: new Date().toISOString(),
           });
           

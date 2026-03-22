@@ -73,6 +73,9 @@ export const AdminLogsSection = ({ logs }: { logs: any[] }) => {
               {log.reason && (
                 <Text className="text-gray-500 text-[10px] italic mt-1">"{log.reason}"</Text>
               )}
+              {log.admin_email && (
+                <Text className="text-[#f1c40f] text-[10px] font-medium mt-1">By: {log.admin_email}</Text>
+              )}
             </View>
           );
         })

@@ -2,13 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { supabase } from '../config/supabase';
 
-// Admin whitelist - emails that should be treated as admins
-// These are stored ONLY in Supabase Auth
-const ADMIN_EMAILS = [
-  'admin@school.com',
-  // Add more admin emails here
-];
-
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,11 +32,25 @@ const LoginScreen = ({ navigation }: any) => {
 
   const isLockedOut = lockoutEndTime !== null && lockoutEndTime > Date.now();
 
-  // Check if email is in admin whitelist
-  const isAdminEmail = (email: string) => {
-    return ADMIN_EMAILS.some(adminEmail => 
-      email.toLowerCase().trim() === adminEmail.toLowerCase()
-    );
+  // Check if user is admin by trying Supabase Auth login
+  const checkAdminUser = async (userEmail: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: userEmail,
+      password,
+    });
+    
+    // If auth succeeds, user is an admin
+    if (!error && data.user) {
+      return { isAdmin: true, user: data.user };
+    }
+    
+    // If auth failed with invalid credentials, user might be a voter
+    if (error?.message?.includes('Invalid login credentials')) {
+      return { isAdmin: false, user: null };
+    }
+    
+    // Other errors - return the error
+    throw error;
   };
 
   const handleLogin = async () => {
@@ -58,24 +65,14 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       const userEmail = email.toLowerCase().trim();
       
-      // Check if admin (whitelisted - use Supabase Auth)
-      if (isAdminEmail(userEmail)) {
-        // Admin login via Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: userEmail,
-          password,
-        });
-
-        if (authError) {
-          handleFailedAttempt();
-          Alert.alert("Auth Error", "Invalid admin credentials.");
-          setLoading(false);
-          return;
-        }
-
+      // Check if admin by trying Supabase Auth first
+      const adminCheck = await checkAdminUser(userEmail, password);
+      
+      if (adminCheck.isAdmin) {
+        // Admin login successful
         setFailedAttempts(0);
         setLockoutEndTime(null);
-        navigation.replace('AdminDashboard');
+        navigation.replace('AdminDashboard', { adminEmail: userEmail });
         setLoading(false);
         return;
       }

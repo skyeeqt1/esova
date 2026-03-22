@@ -6,9 +6,10 @@ import { CandidateSection } from '../components/admin/CandidateSection';
 import { VoterSection } from '../components/admin/VoterSection';
 import { AdminLogsSection } from '../components/admin/AdminLogsSection';
 
-const AdminDashboard = ({ navigation }: any) => {
+const AdminDashboard = ({ navigation, route }: any) => {
   const [activeSection, setActiveSection] = useState<'overview' | 'candidates' | 'voters' | 'logs'>('overview');
-  const adminData = useAdminData();
+  const adminEmail = route?.params?.adminEmail || '';
+  const adminData = useAdminData(adminEmail);
 
   return (
     <View className="flex-1 bg-[#121212] pt-12">
@@ -37,8 +38,8 @@ const AdminDashboard = ({ navigation }: any) => {
 
       <ScrollView className="px-6" showsVerticalScrollIndicator={false} key={activeSection}>
         {activeSection === 'overview' && <OverviewSection {...adminData} />}
-        {activeSection === 'candidates' && <CandidateSection {...adminData} refreshData={adminData.refreshData} />}
-        {activeSection === 'voters' && <VoterSection {...adminData} refreshData={adminData.refreshData} />}
+        {activeSection === 'candidates' && <CandidateSection {...adminData} refreshData={adminData.refreshData} adminEmail={adminData.currentAdminEmail} />}
+        {activeSection === 'voters' && <VoterSection {...adminData} refreshData={adminData.refreshData} adminEmail={adminData.currentAdminEmail} />}
         {/* Render logic for logs section */}
         {activeSection === 'logs' && <AdminLogsSection {...adminData} />}
       </ScrollView>

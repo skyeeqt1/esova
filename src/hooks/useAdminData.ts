@@ -27,18 +27,20 @@ interface Candidate {
 interface AdminLog {
   id: string;
   action: string;
-  targetName: string;
-  targetId: string;
+  target_name: string;
+  target_id: string;
   reason: string;
   timestamp: string;
+  admin_email?: string;
 }
 
-export const useAdminData = () => {
+export const useAdminData = (adminEmail: string = '') => {
   const [voters, setVoters] = useState<Voter[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentAdminEmail, setCurrentAdminEmail] = useState(adminEmail);
 
   useEffect(() => {
     setIsLoading(true);
@@ -139,6 +141,7 @@ export const useAdminData = () => {
       target_name: targetName,
       target_id: targetId,
       reason,
+      admin_email: currentAdminEmail,
       timestamp: new Date().toISOString(),
     });
   };
@@ -163,10 +166,8 @@ export const useAdminData = () => {
           }
         }
 
-        // Log based on collection type
-        if (collectionName === 'users' && extraData) {
-          await addAdminLog("DELETE_VOTER", extraData.name, extraData.studentId, extraData.reason);
-        } else if (collectionName === 'candidates') {
+        // Log based on collection type (only log candidates here, voters are logged in VoterSection)
+        if (collectionName === 'candidates') {
           await addAdminLog("DELETE_CANDIDATE", targetName, targetId, "Candidate removed by admin");
         }
 
@@ -228,6 +229,7 @@ export const useAdminData = () => {
             target_name: "All Data",
             target_id: "SYSTEM",
             reason: "Admin initiated total reset",
+            admin_email: currentAdminEmail,
             timestamp: new Date().toISOString(),
         });
 
@@ -275,6 +277,7 @@ export const useAdminData = () => {
     isLoading,
     handleDeleteItem, 
     handleResetElection,
-    refreshData
+    refreshData,
+    currentAdminEmail
   };
 };
