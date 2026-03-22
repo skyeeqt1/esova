@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, TextInput, Alert, ScrollView } from 'react-native';
 import { BarChart } from "react-native-chart-kit";
 import { POSITIONS } from '../../hooks/useAdminData';
-import { db } from '../../config/firebase';
-import { doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { supabase } from '../../config/supabase';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
@@ -14,20 +13,50 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
   const [timeLeft, setTimeLeft] = useState<string>("00:00");
   const [isVotingOver, setIsVotingOver] = useState(false);
 
-  // Sync with Firestore Settings
+  // Sync with Supabase Settings
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "election_control"), (snap) => {
-      if (snap.exists()) setSettings(snap.data());
-    });
-    return () => unsub();
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 'election_control')
+          .single();
+        
+        if (data) setSettings(data);
+        else if (error && error.code !== 'PGRST116') {
+          // PGRST116 = no rows returned, which is fine for first-time
+          console.error('Error fetching settings:', error);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+
+    fetchSettings();
+
+    // Subscribe to settings changes
+    const channel = supabase
+      .channel('overview-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        if (payload.new && payload.new.id === 'election_control') {
+          setSettings(payload.new);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Real-time Countdown & Auto-UI Logic
   useEffect(() => {
     const timer = setInterval(() => {
-      if (settings?.endTime && settings?.status === 'started') {
+      if (settings?.end_time && settings?.status === 'started') {
         const now = Date.now();
-        const diff = settings.endTime - now;
+        const endTime = new Date(settings.end_time).getTime();
+        const diff = endTime - now;
 
         if (diff <= 0) {
           setTimeLeft("00:00");
@@ -52,11 +81,21 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
     const multiplier = timeUnit === 'min' ? 60000 : 1000;
     const endTime = Date.now() + parseInt(duration) * multiplier;
     
-    await setDoc(doc(db, "settings", "election_control"), {
-      status: 'started',
-      endTime: endTime,
-      resultsPublished: false
-    });
+    // Upsert settings
+    const { error } = await supabase
+      .from('settings')
+      .upsert({
+        id: 'election_control',
+        status: 'started',
+        end_time: new Date(endTime).toISOString(),
+        results_published: false
+      }, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error starting election:', error);
+      Alert.alert("Error", "Failed to start election.");
+      return;
+    }
     Alert.alert("Success", "Election session is now live.");
   };
 
@@ -65,9 +104,18 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
       Alert.alert("Action Denied", "No votes recorded yet.");
       return;
     }
-    await updateDoc(doc(db, "settings", "election_control"), {
-      resultsPublished: !settings?.resultsPublished
-    });
+    
+    const newPublishedState = !settings?.results_published;
+    
+    const { error } = await supabase
+      .from('settings')
+      .update({ results_published: newPublishedState })
+      .eq('id', 'election_control');
+
+    if (error) {
+      console.error('Error updating results:', error);
+      Alert.alert("Error", "Failed to update results visibility.");
+    }
   };
 
   const handlePrint = async () => {
@@ -122,13 +170,17 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
       { text: "Cancel" },
       { 
         text: "Reset", 
-        style: "destructive", 
+        style: 'destructive', 
         onPress: async () => {
-          await setDoc(doc(db, "settings", "election_control"), {
-            status: 'idle',
-            endTime: 0,
-            resultsPublished: false 
-          });
+          await supabase
+            .from('settings')
+            .upsert({
+              id: 'election_control',
+              status: 'idle',
+              end_time: null,
+              results_published: false
+            }, { onConflict: 'id' });
+          
           handleResetElection(); 
         } 
       }
@@ -171,10 +223,10 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
         {isVotingOver && settings?.status === 'started' && (
           <TouchableOpacity 
             onPress={handleToggleResults} 
-            className={`${settings?.resultsPublished ? 'bg-red-500/20 border border-red-500' : 'bg-blue-600'} p-4 rounded-xl items-center`}
+            className={`${settings?.results_published ? 'bg-red-500/20 border border-red-500' : 'bg-blue-600'} p-4 rounded-xl items-center`}
           >
-            <Text className={`${settings?.resultsPublished ? 'text-red-500' : 'text-white'} font-bold uppercase text-xs`}>
-              {settings?.resultsPublished ? 'HIDE RESULTS FROM VOTERS' : 'FLASH RESULTS TO VOTERS'}
+            <Text className={`${settings?.results_published ? 'text-red-500' : 'text-white'} font-bold uppercase text-xs`}>
+              {settings?.results_published ? 'HIDE RESULTS FROM VOTERS' : 'FLASH RESULTS TO VOTERS'}
             </Text>
           </TouchableOpacity>
         )}

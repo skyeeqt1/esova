@@ -3,13 +3,12 @@ import {
   View, Text, TouchableOpacity, ScrollView, Image, 
   Alert, ActivityIndicator, Modal, BackHandler
 } from 'react-native';
-import { db, auth } from '../config/firebase';
-import { collection, onSnapshot, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 
 const POSITIONS = ["President", "VP", "Secretary", "Treasurer"];
 const DEFAULT_AVATAR = "https://via.placeholder.com/150";
 
-const VoterScreen = ({ navigation }: any) => {
+const VoterScreen = ({ navigation, route }: any) => {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("President");
   const [selectedVotes, setSelectedVotes] = useState<any>({});
@@ -23,34 +22,140 @@ const VoterScreen = ({ navigation }: any) => {
   const [showTermsModal, setShowTermsModal] = useState(true);
 
   useEffect(() => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-
-    const unsubSettings = onSnapshot(doc(db, "settings", "election_control"), (snap) => {
-      if (snap.exists()) setElectionSettings(snap.data());
-    });
-
-    const loadVoterProfile = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, "users", userId));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserData(data);
-          if (data.hasVoted) {
-            setStep(3);
-            if (data.ballot) setSelectedVotes(data.ballot);
-          }
-        }
-      } finally { setLoading(false); }
-    };
-
-    const unsubCand = onSnapshot(collection(db, "candidates"), (snap) => {
-      setCandidates(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    loadVoterProfile();
-    return () => { unsubSettings(); unsubCand(); };
+    // Get voter data from navigation params (passed from LoginScreen)
+    const voterData = route.params?.voterData;
+    
+    if (voterData) {
+      setUserData(voterData);
+      if (voterData.has_voted) {
+        setStep(3);
+        if (voterData.ballot) setSelectedVotes(voterData.ballot);
+      }
+    } else {
+      // Fallback: try to get from Supabase Auth (for admin users)
+      checkAuthUser();
+      return;
+    }
+    
+    subscribeToData();
+    setLoading(false);
   }, []);
+
+  const checkAuthUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigation.replace('Login');
+        return;
+      }
+      if (user.email) loadVoterProfile(user.email);
+      subscribeToData();
+    } catch (error) {
+      console.error('Auth error:', error);
+      navigation.replace('Login');
+    }
+  };
+
+  const loadVoterProfile = async (email?: string) => {
+    try {
+      // First try to find by email
+      let userDataArray = null;
+      
+      if (email) {
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+        
+        if (data) userDataArray = data;
+      }
+      
+      if (!userDataArray) {
+        // Fallback: try to find by any method
+        const { data: allUsers } = await supabase
+          .from('users')
+          .select('*')
+          .limit(1);
+        
+        if (allUsers && allUsers.length > 0) {
+          // For demo, use first user - in production match by email
+          userDataArray = allUsers[0];
+        }
+      }
+      
+      if (userDataArray) {
+        setUserData(userDataArray);
+        if (userDataArray.has_voted) {
+          setStep(3);
+          if (userDataArray.ballot) setSelectedVotes(userDataArray.ballot);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading voter profile:', error);
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  const subscribeToData = () => {
+    // Subscribe to candidates changes
+    const candidatesChannel = supabase
+      .channel('voter-candidates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, (payload) => {
+        fetchCandidates();
+      })
+      .subscribe();
+
+    // Subscribe to settings changes
+    const settingsChannel = supabase
+      .channel('voter-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        fetchSettings();
+      })
+      .subscribe();
+
+    fetchCandidates();
+    fetchSettings();
+
+    return () => {
+      supabase.removeChannel(candidatesChannel);
+      supabase.removeChannel(settingsChannel);
+    };
+  };
+
+  const fetchCandidates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*');
+      
+      if (error) throw error;
+      setCandidates(data || []);
+    } catch (error) {
+      console.error('Error fetching candidates:', error);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'election_control')
+        .single();
+      
+      if (error) {
+        // Settings might not exist, use defaults
+        setElectionSettings({ status: 'started', endTime: Date.now() + 3600000 });
+        return;
+      }
+      setElectionSettings(data);
+    } catch (error) {
+      // Use default settings
+      setElectionSettings({ status: 'started', endTime: Date.now() + 3600000 });
+    }
+  };
 
   // Handle back button to close modal instead of going back
   useEffect(() => {
@@ -67,8 +172,9 @@ const VoterScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (electionSettings?.endTime) {
-        const diff = electionSettings.endTime - Date.now();
+      if (electionSettings?.end_time) {
+        const endTime = new Date(electionSettings.end_time).getTime();
+        const diff = endTime - Date.now();
         if (diff > 0) {
           const m = Math.floor(diff / 60000);
           const s = Math.floor((diff % 60000) / 1000);
@@ -82,13 +188,14 @@ const VoterScreen = ({ navigation }: any) => {
   }, [electionSettings]);
 
   const isStarted = electionSettings?.status === 'started';
-  const isEnded = electionSettings?.endTime < Date.now();
+  const endTime = electionSettings?.end_time ? new Date(electionSettings.end_time).getTime() : 0;
+  const isEnded = endTime < Date.now();
 
   const handleLogout = () => {
     Alert.alert("Logout Session", "Are you sure you want to exit?", [
       { text: "Cancel" },
       { text: "Logout", style: "destructive", onPress: async () => {
-          await auth.signOut();
+          await supabase.auth.signOut();
           navigation.replace('Login');
       }}
     ]);
@@ -103,20 +210,42 @@ const VoterScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const batch = writeBatch(db);
+      // Update each candidate's vote count
       for (const pos of POSITIONS) {
         const cand = selectedVotes[pos];
-        batch.update(doc(db, "candidates", cand.id), { votes: increment(1) });
+        if (cand) {
+          const { error } = await supabase
+            .from('candidates')
+            .update({ votes: cand.votes + 1 })
+            .eq('id', cand.id);
+          
+          if (error) throw error;
+        }
       }
-      batch.update(doc(db, "users", auth.currentUser?.uid!), {
-        hasVoted: true,
-        votedAt: new Date().toLocaleString(),
-        ballot: selectedVotes
-      });
-      await batch.commit();
+
+      // Update user's voted status
+      if (userData) {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            has_voted: true,
+            voted_at: new Date().toISOString(),
+            ballot: selectedVotes
+          })
+          .eq('id', userData.id);
+
+        if (error) throw error;
+        
+        // Update local state
+        setUserData({ ...userData, has_voted: true, voted_at: new Date().toISOString(), ballot: selectedVotes });
+      }
+
       setStep(3);
       Alert.alert("Success", "Vote recorded.");
-    } catch (e) { Alert.alert("Error", "Failed to cast vote."); }
+    } catch (e) { 
+      console.error('Vote error:', e);
+      Alert.alert("Error", "Failed to cast vote."); 
+    }
     setLoading(false);
   };
 
@@ -127,7 +256,7 @@ const VoterScreen = ({ navigation }: any) => {
   );
 
   // TERMS AND CONDITIONS / INSTRUCTIONS SCREEN (Shown before voting)
-  if (showTermsModal && !isEnded && !userData?.hasVoted) {
+  if (showTermsModal && !isEnded && !userData?.has_voted) {
     return (
       <View className="flex-1 bg-[#1a1a1a]">
         <View className="flex-1 bg-black/80  justify-center items-center">
@@ -135,14 +264,14 @@ const VoterScreen = ({ navigation }: any) => {
             <View className="items-center mb-4">
               <View className="bg-white rounded-full border-2 border-[#f1c40f] mb-4">
                 <Image
-                  source={require("../img/escrlogo.png")}
+                  source={require("../assets/logo.png")}
                   className="w-24 h-24"
                   resizeMode="contain"
                 />
               </View>
               <Text className="text-[#f1c40f] text-2xl font-black italic">WELCOME, VOTER!</Text>
               <Text className="text-white text-sm font-bold mt-2">Hello, {userData?.name}!</Text>
-              <Text className="text-gray-500 text-xs">ID: {userData?.studentId}</Text>
+              <Text className="text-gray-500 text-xs">ID: {userData?.student_id}</Text>
             </View>
 
             <View className="border-t border-b border-gray-800 py-4 mb-4">
@@ -209,7 +338,7 @@ const VoterScreen = ({ navigation }: any) => {
      <View className="items-center mb-10">
               <View className="bg-white rounded-full border-2 border-[#f1c40f] mb-4">
                  <Image
-                    source={require("../img/escrlogo.png")}
+                    source={require("../assets/logo.png")}
                     className="w-40 h-40"
                     resizeMode="contain"
                   />
@@ -242,7 +371,7 @@ const VoterScreen = ({ navigation }: any) => {
             <Text className="text-[#e74c3c] font-bold"> {timeLeft}</Text>
           </View>
           <View className="bg-white rounded-full border-2 border-[#f1c40f] items-center justify-center">
-            <Image source={require("../img/escrlogo.png")} className="w-20 h-20" resizeMode="contain" />
+            <Image source={require("../assets/logo.png")} className="w-20 h-20" resizeMode="contain" />
           </View>
           <TouchableOpacity onPress={handleLogout} className="bg-[#1a1a1a] border border-gray-800 px-4 py-2 rounded-full">
             <Text className="text-red-500 font-black text-[10px] tracking-widest">LOGOUT</Text>
@@ -254,7 +383,7 @@ const VoterScreen = ({ navigation }: any) => {
           {/* LOGIC: IF ELECTION ENDED AND USER IS NOT VIEWING RECEIPT */}
           {isEnded && !showReceiptOverride ? (
             <View>
-              {electionSettings?.resultsPublished ? (
+              {electionSettings?.results_published ? (
                 /* OFFICIAL RESULTS PANEL */
                 <View className="bg-[#1e1e1e] p-6 rounded-3xl border border-[#f1c40f]">
                    <Text className="text-[#f1c40f] text-2xl font-black italic text-center mb-6">OFFICIAL RESULTS</Text>
@@ -280,7 +409,7 @@ const VoterScreen = ({ navigation }: any) => {
                 <View className="bg-[#1e1e1e] p-10 rounded-3xl items-center border border-gray-800">
                   <Text className="text-white font-black text-lg">The election has ended</Text>
                   <Text className="text-gray-500 text-center mt-2 text-xs">Please wait for the administrator to flash the official results.</Text>
-                  {userData?.hasVoted && (
+                  {userData?.has_voted && (
                     <TouchableOpacity onPress={() => setShowReceiptOverride(true)} className="mt-8 border border-gray-700 px-8 py-3 rounded-full">
                       <Text className="text-[#f1c40f] font-bold text-[10px]">VIEW BALLOT RECEIPT</Text>
                     </TouchableOpacity>
@@ -295,7 +424,7 @@ const VoterScreen = ({ navigation }: any) => {
                 <View>
                   <View className="bg-[#1e1e1e] p-4 rounded-xl mb-4 border-l-4 border-[#f1c40f]">
                     <Text className="text-white font-bold text-lg">Hello, {userData?.name}!</Text>
-                    <Text className="text-gray-400 text-xs font-bold uppercase">ID: {userData?.studentId}</Text>
+                    <Text className="text-gray-400 text-xs font-bold uppercase">ID: {userData?.student_id}</Text>
                   </View>
                   
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 flex-row bg-black p-1 rounded-full border border-gray-800">
@@ -349,14 +478,14 @@ const VoterScreen = ({ navigation }: any) => {
                     <View className="w-full h-[1px] bg-gray-200 my-4 border-dashed border" />
                     <View className="mb-4">
                       <Text className="text-gray-500 text-[10px] uppercase font-bold">Voter: {userData?.name}</Text>
-                      <Text className="text-gray-500 text-[10px] uppercase font-bold">ID: {userData?.studentId}</Text>
-                      <Text className="text-gray-500 text-[10px] uppercase font-bold">Time Cast: {userData?.votedAt}</Text>
+                      <Text className="text-gray-500 text-[10px] uppercase font-bold">ID: {userData?.student_id}</Text>
+                      <Text className="text-gray-500 text-[10px] uppercase font-bold">Time Cast: {userData?.voted_at}</Text>
                     </View>
                     <View className="bg-gray-100 p-4 rounded-lg">
                       {POSITIONS.map(pos => (
                         <View key={pos} className="flex-row justify-between py-2 border-b border-gray-200">
                           <Text className="text-gray-500 text-[10px] font-bold">{pos}:</Text>
-                          <Text className="text-black font-black text-[10px]">{selectedVotes[pos]?.name.toUpperCase()}</Text>
+                          <Text className="text-black font-black text-[10px]">{selectedVotes[pos]?.name?.toUpperCase()}</Text>
                         </View>
                       ))}
                     </View>

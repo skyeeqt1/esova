@@ -4,9 +4,7 @@ import {
   Alert, Platform, ScrollView, Modal
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { auth, db } from '../../config/firebase';
-import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { supabase } from '../../config/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import Papa from 'papaparse';
@@ -16,7 +14,7 @@ interface FilePickerResult {
   canceled: boolean;
 }
 
-export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProcessing }: any) => {
+export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProcessing, refreshData }: any) => {
   const navigation = useNavigation();
   
   // --- FORM STATES ---
@@ -24,10 +22,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
   const [voterID, setVoterID] = useState('');
   const [voterEmail, setVoterEmail] = useState('');
   const [voterPassword, setVoterPassword] = useState('');
-  const [voterAge, setVoterAge] = useState('');
-  const [voterGender, setVoterGender] = useState('');
-  const [voterYear, setVoterYear] = useState('');
-  const [voterBlock, setVoterBlock] = useState('');
+  // Extra fields removed - keeping only: name, student_id, email, password
   
   // --- UI STATES ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,33 +58,56 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
 
     setIsProcessing(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        voterEmail.trim().toLowerCase(),
-        voterPassword.trim()
-      );
-      
-      await setDoc(doc(db, "users", userCredential.user.uid), { 
+      // Add user directly to users table (NOT in Supabase Auth)
+      // Password is stored in the table for student login
+      const { error: dbError } = await supabase.from('users').insert({ 
         name: voterName.trim(),
         email: voterEmail.toLowerCase().trim(),
-        studentId: voterID.trim(),
+        student_id: voterID.trim(),
         role: "voter",
-        hasVoted: false,
+        has_voted: false,
         ballot: null,
-        votedAt: null,
-        age: voterAge,
-        gender: voterGender,
-        year: voterYear,
-        block: voterBlock
+        voted_at: null,
+        password: voterPassword.trim() // Store password in table
       });
 
+      if (dbError) {
+        console.error('Database error:', dbError);
+        Platform.OS === 'web' ? alert(dbError.message) : Alert.alert("Error", dbError.message);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Log the voter addition
+      const { error: logError } = await supabase.from('admin_logs').insert({
+        action: "ADD_VOTER",
+        target_name: voterName.trim(),
+        target_id: voterID.trim(),
+        reason: `Student registered - Email: ${voterEmail.toLowerCase().trim()}`,
+        timestamp: new Date().toISOString(),
+      });
+      
+      if (logError) {
+        console.error('Failed to add log:', logError);
+        Platform.OS === 'web' ? alert("Log Error: " + logError.message) : Alert.alert("Log Error", "Could not add activity log: " + logError.message);
+      }
+      
+      // Refresh logs to show new entry
+      if (refreshData) {
+        await refreshData();
+      }
+
       setVoterName(''); setVoterID(''); setVoterEmail(''); setVoterPassword('');
-      setVoterAge(''); setVoterGender(''); setVoterYear(''); setVoterBlock('');
 
       const msg = `Student ${voterName} added successfully!`;
       Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
+      
+      // Refresh data if function provided
+      if (refreshData) {
+        await refreshData();
+      }
     } catch (e: any) {
-      const errorMsg = e.code === 'auth/email-already-in-use' ? "Email already exists" : e.message;
+      const errorMsg = e.message || "An error occurred";
       Platform.OS === 'web' ? alert(errorMsg) : Alert.alert("Error", errorMsg);
     }
     setIsProcessing(false);
@@ -108,14 +126,18 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
 
     setIsProcessing(true);
     try {
-      // 1. Log the deletion to a 'logs' collection for auditing
-      await addDoc(collection(db, "admin_logs"), {
+      // 1. Log the deletion to admin_logs table
+      const { error: logError } = await supabase.from('admin_logs').insert({
         action: "DELETE_VOTER",
-        targetName: voterToRemove.name,
-        targetId: voterToRemove.studentId,
+        target_name: voterToRemove.name,
+        target_id: voterToRemove.student_id,
         reason: removalReason,
-        timestamp: serverTimestamp(),
+        timestamp: new Date().toISOString(),
       });
+
+      if (logError) {
+        console.error('Log error:', logError);
+      }
 
       // 2. Perform the actual deletion
       await handleDeleteItem("users", voterToRemove.id);
@@ -149,19 +171,46 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
             const row = records[i];
             setImportProgress(`Importing ${i + 1}/${records.length}`);
             try {
-              const userCred = await createUserWithEmailAndPassword(auth, row.email.trim(), row.password || row.studentId);
-              await setDoc(doc(db, "users", userCred.user.uid), {
-                name: row.fullname, email: row.email, studentId: row.studentId,
-                role: "voter", hasVoted: false, age: row.age, gender: row.gender
+              // Add directly to users table (NOT in Supabase Auth)
+              const password = row.password || row.studentId || 'defaultPassword123';
+              const { error: dbError } = await supabase.from('users').insert({
+                name: row.fullname,
+                email: row.email,
+                student_id: row.studentId,
+                role: "voter",
+                has_voted: false,
+                password: password,
               });
-            } catch (err) { console.warn(err); }
+
+              if (dbError) {
+                console.warn('DB error for:', row.email, dbError.message);
+              }
+            } catch (err) { 
+              console.warn(err); 
+            }
           }
+          
+          // Log the bulk import
+          const { error: logError } = await supabase.from('admin_logs').insert({
+            action: "IMPORT_VOTERS",
+            target_name: `${records.length} students`,
+            target_id: "BULK_IMPORT",
+            reason: `Bulk import from CSV file`,
+            timestamp: new Date().toISOString(),
+          });
+          
+          if (logError) {
+            console.error('Failed to add log:', logError);
+          }
+          
           setIsProcessing(false);
           setImportProgress('');
           Alert.alert("Complete", "Import finished.");
         }
       });
-    } catch (e) { setIsProcessing(false); }
+    } catch (e) { 
+      setIsProcessing(false); 
+    }
   };
 
   return (
@@ -191,10 +240,10 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
         <View key={v.id} className="bg-[#1e1e1e] p-4 rounded-xl mb-2 border border-gray-800 flex-row items-center">
           <View className="flex-1">
             <Text className="text-white font-bold">{v.name}</Text>
-            <Text className="text-gray-500 text-[10px] uppercase font-bold">{v.studentId}</Text>
+            <Text className="text-gray-500 text-[10px] uppercase font-bold">{v.student_id}</Text>
           </View>
-          <View className={`px-2 py-1 rounded mr-3 ${v.hasVoted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
-            <Text className={`text-[8px] font-bold ${v.hasVoted ? 'text-green-500' : 'text-yellow-600'}`}>{v.hasVoted ? 'VOTED' : 'PENDING'}</Text>
+          <View className={`px-2 py-1 rounded mr-3 ${v.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
+            <Text className={`text-[8px] font-bold ${v.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>{v.has_voted ? 'VOTED' : 'PENDING'}</Text>
           </View>
           <TouchableOpacity onPress={() => confirmDelete(v)} className="bg-red-500/10 p-2 rounded">
             <Text className="text-red-500 text-xs font-bold">REMOVE</Text>

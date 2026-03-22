@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useAdminData } from '../hooks/useAdminData';
 import { OverviewSection } from '../components/admin/OverviewSection';
 import { CandidateSection } from '../components/admin/CandidateSection';
 import { VoterSection } from '../components/admin/VoterSection';
-import { AdminLogsSection } from '../components/admin/AdminLogsSection'; // Import added
+import { AdminLogsSection } from '../components/admin/AdminLogsSection';
 
 const AdminDashboard = ({ navigation }: any) => {
-  // Added 'logs' to the state type
   const [activeSection, setActiveSection] = useState<'overview' | 'candidates' | 'voters' | 'logs'>('overview');
   const adminData = useAdminData();
 
@@ -15,7 +14,7 @@ const AdminDashboard = ({ navigation }: any) => {
     <View className="flex-1 bg-[#121212] pt-12">
       <View className="px-6 flex-row justify-between items-center mb-6">
         <View className="bg-white rounded-full border-2 border-[#f1c40f]">
-           <Image source={require("../img/escrlogo.png")} className="w-20 h-20" resizeMode="contain" />
+           <Image source={require("../assets/logo.png")} className="w-20 h-20" resizeMode="contain" />
         </View>
         <View>
           <Text className="text-[#00b894] text-xl font-bold">ESCR ADMIN</Text>
@@ -36,11 +35,11 @@ const AdminDashboard = ({ navigation }: any) => {
         ))}
       </View>
 
-      <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
+      <ScrollView className="px-6" showsVerticalScrollIndicator={false} key={activeSection}>
         {activeSection === 'overview' && <OverviewSection {...adminData} />}
-        {activeSection === 'candidates' && <CandidateSection {...adminData} />}
-        {activeSection === 'voters' && <VoterSection {...adminData} />}
-        {/* Render logic for logs section added */}
+        {activeSection === 'candidates' && <CandidateSection {...adminData} refreshData={adminData.refreshData} />}
+        {activeSection === 'voters' && <VoterSection {...adminData} refreshData={adminData.refreshData} />}
+        {/* Render logic for logs section */}
         {activeSection === 'logs' && <AdminLogsSection {...adminData} />}
       </ScrollView>
     </View>

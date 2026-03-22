@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Platform, Alert } from 'react-native';
-import { db } from '../config/firebase';
-import { 
-  collection, onSnapshot, query, where, doc, 
-  deleteDoc, writeBatch, orderBy, limit, addDoc, serverTimestamp 
-} from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 
 export const DEFAULT_AVATAR = "https://via.placeholder.com/150";
 export const POSITIONS = ["President", "VP", "Secretary", "Treasurer"];
@@ -13,11 +9,11 @@ interface Voter {
   id: string;
   name: string;
   email: string;
-  studentId: string;
+  student_id: string;
   role: 'voter';
-  hasVoted: boolean;
+  has_voted: boolean;
   ballot?: string | null;
-  votedAt?: string | null;
+  voted_at?: string | null;
 }
 
 interface Candidate {
@@ -34,78 +30,153 @@ interface AdminLog {
   targetName: string;
   targetId: string;
   reason: string;
-  timestamp: any;
+  timestamp: string;
 }
 
 export const useAdminData = () => {
   const [voters, setVoters] = useState<Voter[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [logs, setLogs] = useState<AdminLog[]>([]); // New state for logs
+  const [logs, setLogs] = useState<AdminLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
     
-    // 1. Voters Listener
-    const unsubVoters = onSnapshot(
-      query(collection(db, "users"), where("role", "==", "voter")),
-      (snap) => {
-        setVoters(snap.docs.map(d => ({ id: d.id, ...d.data() } as Voter)));
-      },
-      (error) => handleListenerError(error, "voters")
-    );
+    // Fetch voters
+    fetchVoters();
+    
+    // Fetch candidates
+    fetchCandidates();
+    
+    // Fetch admin logs
+    fetchLogs();
 
-    // 2. Candidates Listener
-    const unsubCandidates = onSnapshot(
-      collection(db, "candidates"),
-      (snap) => {
-        setCandidates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Candidate)));
-        setIsLoading(false);
-      },
-      (error) => handleListenerError(error, "candidates")
-    );
+    // Set up real-time subscriptions
+    const votersChannel = supabase
+      .channel('voters-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchVoters();
+      })
+      .subscribe();
 
-    // 3. Admin Logs Listener (New)
-    const unsubLogs = onSnapshot(
-      query(collection(db, "admin_logs"), orderBy("timestamp", "desc"), limit(50)),
-      (snap) => {
-        setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminLog)));
-      },
-      (error) => console.error("Logs listener error:", error)
-    );
+    const candidatesChannel = supabase
+      .channel('candidates-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
+        fetchCandidates();
+      })
+      .subscribe();
 
-    return () => { 
-      unsubVoters(); 
-      unsubCandidates(); 
-      unsubLogs();
+    const logsChannel = supabase
+      .channel('logs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_logs' }, () => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(votersChannel);
+      supabase.removeChannel(candidatesChannel);
+      supabase.removeChannel(logsChannel);
     };
   }, []);
 
+  const fetchVoters = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'voter');
+      
+      if (error) throw error;
+      setVoters(data || []);
+    } catch (error: any) {
+      console.error('Error fetching voters:', error);
+    }
+  };
+
+  const fetchCandidates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*');
+      
+      if (error) throw error;
+      setCandidates(data || []);
+      setIsLoading(false);
+    } catch (error: any) {
+      console.error('Error fetching candidates:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      setLogs(data || []);
+    } catch (error: any) {
+      console.error('Error fetching logs:', error);
+    }
+  };
+
   const handleListenerError = (error: any, type: string) => {
-    console.error(`${type} listener error:`, error);
-    const msg = error.message || `Permission denied for ${type}`;
+    console.error(`${type} error:`, error);
+    const msg = error.message || `Error fetching ${type}`;
     Platform.OS === 'web' ? alert(msg) : Alert.alert("Error", msg);
     setIsLoading(false);
   };
 
-  // Updated to include reason for Audit Logs
+  // Helper function to add admin log
+  const addAdminLog = async (action: string, targetName: string, targetId: string, reason: string) => {
+    await supabase.from('admin_logs').insert({
+      action,
+      target_name: targetName,
+      target_id: targetId,
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
   const handleDeleteItem = async (collectionName: string, id: string, extraData?: { name: string, studentId: string, reason: string }) => {
     const performDelete = async () => {
       setIsProcessing(true);
       try {
-        // If it's a voter deletion, log the reason first
-        if (collectionName === "users" && extraData) {
-          await addDoc(collection(db, "admin_logs"), {
-            action: "DELETE_VOTER",
-            targetName: extraData.name,
-            targetId: extraData.studentId,
-            reason: extraData.reason,
-            timestamp: serverTimestamp(),
-          });
+        // Get candidate info before deletion for logging
+        let targetName = '';
+        let targetId = '';
+        
+        if (collectionName === 'candidates') {
+          const { data: candidateData } = await supabase
+            .from('candidates')
+            .select('name, position')
+            .eq('id', id)
+            .single();
+          if (candidateData) {
+            targetName = candidateData.name;
+            targetId = candidateData.position;
+          }
         }
 
-        await deleteDoc(doc(db, collectionName, id));
+        // Log based on collection type
+        if (collectionName === 'users' && extraData) {
+          await addAdminLog("DELETE_VOTER", extraData.name, extraData.studentId, extraData.reason);
+        } else if (collectionName === 'candidates') {
+          await addAdminLog("DELETE_CANDIDATE", targetName, targetId, "Candidate removed by admin");
+        }
+
+        const { error } = await supabase
+          .from(collectionName)
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
         const msg = "Record deleted successfully";
         Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
       } catch (e: any) {
@@ -115,8 +186,6 @@ export const useAdminData = () => {
       }
     };
 
-    // Note: Confirmation UI is now handled inside VoterSection modal for reason input, 
-    // but we keep this for Candidate deletions or simple removals.
     if (!extraData) {
         if (Platform.OS === 'web') {
             if (window.confirm("Delete record? This cannot be undone.")) await performDelete();
@@ -135,19 +204,31 @@ export const useAdminData = () => {
     const performReset = async () => {
       setIsProcessing(true);
       try {
-        const batch = writeBatch(db);
-        candidates.forEach(c => batch.update(doc(db, "candidates", c.id), { votes: 0 }));
-        voters.forEach(v => batch.update(doc(db, "users", v.id), { hasVoted: false, ballot: null, votedAt: null }));
+        // Reset all candidates' votes
+        for (const candidate of candidates) {
+          const { error } = await supabase
+            .from('candidates')
+            .update({ votes: 0 })
+            .eq('id', candidate.id);
+          if (error) throw error;
+        }
         
-        await batch.commit();
+        // Reset all voters' voted status
+        for (const voter of voters) {
+          const { error } = await supabase
+            .from('users')
+            .update({ has_voted: false, ballot: null, voted_at: null })
+            .eq('id', voter.id);
+          if (error) throw error;
+        }
         
         // Log the reset action
-        await addDoc(collection(db, "admin_logs"), {
+        await supabase.from('admin_logs').insert({
             action: "RESET_ELECTION",
-            targetName: "All Data",
-            targetId: "SYSTEM",
+            target_name: "All Data",
+            target_id: "SYSTEM",
             reason: "Admin initiated total reset",
-            timestamp: serverTimestamp(),
+            timestamp: new Date().toISOString(),
         });
 
         const msg = "Election reset successfully";
@@ -172,18 +253,28 @@ export const useAdminData = () => {
 
   const handleActionError = (e: any, type: string) => {
     console.error(`${type} error:`, e);
-    const errorMsg = e.code === 'permission-denied' ? `No permission to ${type.toLowerCase()}` : e.message;
+    const errorMsg = e.message || `Error during ${type.toLowerCase()}`;
     Platform.OS === 'web' ? alert(errorMsg) : Alert.alert("Error", errorMsg);
+  };
+
+  // Refresh function to manually refresh all data
+  const refreshData = async () => {
+    await Promise.all([
+      fetchVoters(),
+      fetchCandidates(),
+      fetchLogs()
+    ]);
   };
 
   return { 
     voters, 
     candidates, 
-    logs, // Return logs to the UI
+    logs,
     isProcessing, 
     setIsProcessing, 
     isLoading,
     handleDeleteItem, 
-    handleResetElection 
+    handleResetElection,
+    refreshData
   };
 };

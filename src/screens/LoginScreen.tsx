@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { supabase } from '../config/supabase';
+
+// Admin whitelist - emails that should be treated as admins
+// These are stored ONLY in Supabase Auth
+const ADMIN_EMAILS = [
+  'admin@school.com',
+  // Add more admin emails here
+];
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -34,6 +39,13 @@ const LoginScreen = ({ navigation }: any) => {
 
   const isLockedOut = lockoutEndTime !== null && lockoutEndTime > Date.now();
 
+  // Check if email is in admin whitelist
+  const isAdminEmail = (email: string) => {
+    return ADMIN_EMAILS.some(adminEmail => 
+      email.toLowerCase().trim() === adminEmail.toLowerCase()
+    );
+  };
+
   const handleLogin = async () => {
     if (isLockedOut) {
       Alert.alert("Account Temporarily Locked", `Too many failed attempts. Please wait ${timeLeft} before trying again.`);
@@ -44,29 +56,61 @@ const LoginScreen = ({ navigation }: any) => {
     
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+      const userEmail = email.toLowerCase().trim();
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
+      // Check if admin (whitelisted - use Supabase Auth)
+      if (isAdminEmail(userEmail)) {
+        // Admin login via Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password,
+        });
+
+        if (authError) {
+          handleFailedAttempt();
+          Alert.alert("Auth Error", "Invalid admin credentials.");
+          setLoading(false);
+          return;
+        }
+
         setFailedAttempts(0);
         setLockoutEndTime(null);
-        if (userData.role === 'admin') {
-          navigation.replace('AdminDashboard');
-        } else {
-          navigation.replace('VoterScreen');
-        }
-      } else {
-        handleFailedAttempt();
-        Alert.alert("Access Denied", "No student record found for this account.");
+        navigation.replace('AdminDashboard');
+        setLoading(false);
+        return;
       }
+
+      // Student login - verify against users table (NOT Supabase Auth)
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .single();
+
+      if (userError || !userData) {
+        handleFailedAttempt();
+        Alert.alert("Access Denied", "Email not registered.");
+        setLoading(false);
+        return;
+      }
+
+      // Verify password against stored password
+      if (userData.password !== password) {
+        handleFailedAttempt();
+        Alert.alert("Access Denied", "Invalid password.");
+        setLoading(false);
+        return;
+      }
+
+      setFailedAttempts(0);
+      setLockoutEndTime(null);
+      
+      // Regular voter - go to VoterScreen with user data
+      navigation.replace('VoterScreen', { voterData: userData });
+      
     } catch (error: any) {
       handleFailedAttempt();
-      let msg = "Login failed. Please check your internet connection.";
-      if (error.code === 'auth/wrong-password') msg = "Invalid password.";
-      if (error.code === 'auth/user-not-found') msg = "Email not registered.";
-      
-      Alert.alert("Auth Error", msg);
+      Alert.alert("Error", "Login failed. Please check your internet connection.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +149,7 @@ const LoginScreen = ({ navigation }: any) => {
           <View className="pt-16 pb-8 px-6 items-center">
             <View className="bg-white rounded-full border-4 border-[#f1c40f] mb-4 shadow-lg shadow-yellow-500/20">
               <Image
-                source={require("../img/escrlogo.png")}
+                source={require("../assets/logo.png")}
                 className="w-36 h-36"
                 resizeMode="contain"
               />

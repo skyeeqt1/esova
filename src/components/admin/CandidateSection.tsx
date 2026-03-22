@@ -8,14 +8,21 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 
 // Configs
-import { db } from '../../config/firebase'; 
 import { supabase } from '../../config/supabase';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 
 // Shared Hooks/Data
 import { DEFAULT_AVATAR, POSITIONS } from '../../hooks/useAdminData';
 
-export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, setIsProcessing }: any) => {
+// Callback to refresh data from parent
+interface Props {
+  candidates: any[];
+  handleDeleteItem: any;
+  isProcessing: boolean;
+  setIsProcessing: any;
+  onRefresh?: () => void;
+}
+
+export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, setIsProcessing, refreshData }: any) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,11 +72,11 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
       }
 
       const { data, error } = await supabase.storage
-        .from('candidate-profiles')
+        .from('candidate-images')
         .upload(filePath, body, { contentType: 'image/png', upsert: true });
 
       if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('candidate-profiles').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('candidate-images').getPublicUrl(filePath);
       return publicUrl;
     } catch (err: any) {
       throw new Error(err.message || "Upload failed.");
@@ -107,13 +114,71 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
       if (isNewLocalFile) finalImageUrl = await uploadToSupabase(candImage);
 
       const payload = { ...form, image: finalImageUrl };
+      
       if (editingId) {
-        await updateDoc(doc(db, "candidates", editingId), payload);
+        // Update existing candidate
+        const { error } = await supabase
+          .from('candidates')
+          .update(payload)
+          .eq('id', editingId);
+        
+        if (error) throw error;
+        
+        // Log the update action
+        const { error: logError } = await supabase.from('admin_logs').insert({
+          action: "UPDATE_CANDIDATE",
+          target_name: form.name,
+          target_id: form.position,
+          reason: `Updated candidate details - Course: ${form.course}, Year: ${form.year}`,
+          timestamp: new Date().toISOString(),
+        });
+        
+        if (logError) {
+          console.error('Failed to add log:', logError);
+          Alert.alert("Log Error", "Could not add activity log: " + logError.message);
+        }
+        
+        // Refresh data immediately after update
+        if (refreshData) {
+          await refreshData();
+        }
+        
         Alert.alert("Updated", "Candidate information synced.");
       } else {
-        await addDoc(collection(db, "candidates"), { ...payload, votes: 0 });
+        // Add new candidate
+        const { error } = await supabase
+          .from('candidates')
+          .insert({ ...payload, votes: 0 });
+        
+        if (error) throw error;
+        
+        // Log the addition
+        const { error: logError } = await supabase.from('admin_logs').insert({
+          action: "ADD_CANDIDATE",
+          target_name: form.name,
+          target_id: form.position,
+          reason: `New candidate registered - Course: ${form.course}, Year: ${form.year}`,
+          timestamp: new Date().toISOString(),
+        });
+        
+        if (logError) {
+          console.error('Failed to add log:', logError);
+          Alert.alert("Log Error", "Could not add activity log: " + logError.message);
+        }
+        
+        // Refresh logs to show new entry
+        if (refreshData) {
+          await refreshData();
+        }
+        
         Alert.alert("Registered", "New candidate added.");
       }
+      
+      // Refresh data immediately after save
+      if (refreshData) {
+        await refreshData();
+      }
+      
       resetForm();
     } catch (e: any) {
       Alert.alert("Error", e.message);
