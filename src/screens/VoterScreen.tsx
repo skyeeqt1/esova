@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TouchableOpacity, ScrollView, Image, 
-  Alert, ActivityIndicator, Modal 
+  Alert, ActivityIndicator, Modal, BackHandler
 } from 'react-native';
 import { db, auth } from '../config/firebase';
 import { collection, onSnapshot, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
@@ -51,6 +51,19 @@ const VoterScreen = ({ navigation }: any) => {
     loadVoterProfile();
     return () => { unsubSettings(); unsubCand(); };
   }, []);
+
+  // Handle back button to close modal instead of going back
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (viewingCandidate) {
+        setViewingCandidate(null); // Close the modal
+        return true; // Prevent default back button behavior
+      }
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [viewingCandidate]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -361,7 +374,7 @@ const VoterScreen = ({ navigation }: any) => {
       </View>
       
       {/* Profile Modal */}
-      <Modal visible={!!viewingCandidate} animationType="slide" transparent={true}>
+      <Modal visible={!!viewingCandidate} animationType="slide" transparent={true} onRequestClose={() => setViewingCandidate(null)}>
         <View className="flex-1 justify-center items-center bg-black/90 p-6">
           <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 p-8">
             <Image source={{ uri: viewingCandidate?.image || DEFAULT_AVATAR }} className="w-32 h-32 rounded-3xl border-2 border-[#f1c40f] mx-auto bg-black" />

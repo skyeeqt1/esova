@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, 
-  Alert, Platform, ScrollView, Modal 
+  Alert, Platform, ScrollView, Modal
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { auth, db } from '../../config/firebase';
 import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -16,6 +17,8 @@ interface FilePickerResult {
 }
 
 export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProcessing }: any) => {
+  const navigation = useNavigation();
+  
   // --- FORM STATES ---
   const [voterName, setVoterName] = useState('');
   const [voterID, setVoterID] = useState('');
@@ -34,6 +37,21 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
   const [removalReason, setRemovalReason] = useState('');
   
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Handle back button when modal is open using React Navigation events
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (isRemoveModalVisible) {
+        // Prevent default navigation and close modal instead
+        e.preventDefault();
+        setIsRemoveModalVisible(false);
+        setRemovalReason('');
+        setVoterToRemove(null);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isRemoveModalVisible]);
 
   // --- HANDLERS ---
   const handleAddVoter = async () => {
@@ -185,7 +203,16 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
       ))}
 
       {/* REMOVAL MODAL */}
-      <Modal visible={isRemoveModalVisible} transparent animationType="fade">
+      <Modal 
+        visible={isRemoveModalVisible} 
+        transparent 
+        animationType="fade"
+        onRequestClose={() => {
+          setIsRemoveModalVisible(false);
+          setRemovalReason('');
+          setVoterToRemove(null);
+        }}
+      >
         <View className="flex-1 justify-center items-center bg-black/80 p-6">
           <View className="bg-[#1e1e1e] w-full p-6 rounded-3xl border border-gray-800">
             <Text className="text-white text-xl font-bold mb-2">Remove {voterToRemove?.name}?</Text>

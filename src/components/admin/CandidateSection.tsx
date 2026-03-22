@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, Image, 
-  ScrollView, ActivityIndicator, Platform, Modal, Alert 
+  ScrollView, ActivityIndicator, Platform, Modal, Alert, BackHandler
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy'; 
@@ -28,6 +28,19 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   const [form, setForm] = useState(initialState);
   const [candImage, setCandImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<any>(null);
+
+  // Handle back button to close modal instead of going back
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selectedCandidate) {
+        setSelectedCandidate(null); // Close the modal
+        return true; // Prevent default back button behavior
+      }
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [selectedCandidate]);
 
   // --- SEARCH LOGIC ---
   const filteredCandidates = useMemo(() => {
@@ -207,7 +220,7 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
       )}
 
       {/* --- DETAIL MODAL (Functional) --- */}
-      <Modal visible={!!selectedCandidate} animationType="slide" transparent={true}>
+      <Modal visible={!!selectedCandidate} animationType="slide" transparent={true} onRequestClose={() => setSelectedCandidate(null)}>
         <View className="flex-1 justify-center items-center bg-black/90 p-6">
           <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 overflow-hidden">
             <View className="items-center p-6 bg-[#252525]">
