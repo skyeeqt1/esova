@@ -59,34 +59,57 @@ const LoginScreen = ({ navigation }: any) => {
       return;
     }
     
-    if (!email || !password) return Alert.alert("Required", "Please enter your email and password.");
+    if (!email || !password) return Alert.alert("Required", "Please enter your email or student ID and password.");
     
     setLoading(true);
     try {
-      const userEmail = email.toLowerCase().trim();
+      const userInput = email.toLowerCase().trim();
       
-      // Check if admin by trying Supabase Auth first
-      const adminCheck = await checkAdminUser(userEmail, password);
+      // Check if admin by trying Supabase Auth first (only if it looks like an email)
+      const isEmail = userInput.includes('@');
+      let adminCheck = null;
       
-      if (adminCheck.isAdmin) {
+      if (isEmail) {
+        adminCheck = await checkAdminUser(userInput, password);
+      }
+      
+      if (isEmail && adminCheck?.isAdmin) {
         // Admin login successful
         setFailedAttempts(0);
         setLockoutEndTime(null);
-        navigation.replace('AdminDashboard', { adminEmail: userEmail });
+        navigation.replace('AdminDashboard', { adminEmail: userInput });
         setLoading(false);
         return;
       }
 
       // Student login - verify against users table (NOT Supabase Auth)
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', userEmail)
-        .single();
+      // Try to find by email OR student_id
+      let userData = null;
+      let userError = null;
+      
+      if (isEmail) {
+        // If it looks like an email, search by email
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', userInput)
+          .single();
+        userData = result.data;
+        userError = result.error;
+      } else {
+        // Otherwise search by student_id
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('student_id', userInput)
+          .single();
+        userData = result.data;
+        userError = result.error;
+      }
 
       if (userError || !userData) {
         handleFailedAttempt();
-        Alert.alert("Access Denied", "Email not registered.");
+        Alert.alert("Access Denied", "Email or Student ID not registered.");
         setLoading(false);
         return;
       }
@@ -183,7 +206,7 @@ const LoginScreen = ({ navigation }: any) => {
                     <Text className="text-gray-500">📧</Text>
                   </View>
                   <TextInput 
-                    placeholder="Enter your email"
+                    placeholder="Enter your email or Student ID"
                     placeholderTextColor="#555"
                     autoCapitalize="none"
                     keyboardType="email-address"
