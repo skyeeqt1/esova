@@ -99,6 +99,16 @@ const LoginScreen = ({ navigation }: any) => {
         return;
       }
 
+      // Check if user needs to change password (first time login)
+      if (userData.must_change_password) {
+        setFailedAttempts(0);
+        setLockoutEndTime(null);
+        // Navigate to password change screen first
+        navigation.replace('ChangePassword', { voterData: userData });
+        setLoading(false);
+        return;
+      }
+
       setFailedAttempts(0);
       setLockoutEndTime(null);
       

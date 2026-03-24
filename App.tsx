@@ -6,6 +6,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import AdminDashboard from './src/screens/AdminDashboard';
 import VoterScreen from './src/screens/VoterScreen';
 import VoterProfile from './src/screens/VoterProfile';
+import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import "./global.css";
 
 const Stack = createNativeStackNavigator();
@@ -52,6 +53,7 @@ export default function App() {
         <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
         <Stack.Screen name="VoterScreen" component={VoterScreen} />
         <Stack.Screen name="VoterProfile" component={VoterProfile} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
