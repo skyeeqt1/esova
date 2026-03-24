@@ -60,7 +60,7 @@ const ChangePasswordScreen = ({ navigation, route }: any) => {
       <View className="bg-[#1e1e1e] w-full p-6 rounded-3xl border border-[#f1c40f]">
         {/* Header */}
         <View className="items-center mb-6">
-          <Text className="text-[#f1c40f] text-2xl font-black italic">CHANGE PASSWORD</Text>
+          <Text className="text-[#f1c40f] text-lg font-black text-center">CHANGE PASSWORD</Text>
           <Text className="text-gray-500 text-xs mt-2 text-center">
             You are logging in for the first time.{'\n'}Please create a new password to continue.
           </Text>

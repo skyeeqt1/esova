@@ -33,6 +33,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
   const [isResetModalVisible, setIsResetModalVisible] = useState(false);
   const [voterToReset, setVoterToReset] = useState<any>(null);
   const [newResetPassword, setNewResetPassword] = useState('');
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
   
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -125,10 +126,60 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
 
   const confirmReset = (voter: any) => {
     setVoterToReset(voter);
+    setIsResetModalVisible(true);
+    setIsPasswordReset(false); // Reset state to show confirmation first
+    setNewResetPassword('');
+  };
+
+  const generateAndResetPassword = async () => {
     // Generate a new random password
     const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
     setNewResetPassword(generatedPassword);
-    setIsResetModalVisible(true);
+    setIsProcessing(true);
+    
+    try {
+      // Update the password in the database and require password change
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ 
+          password: generatedPassword,
+          must_change_password: true // Force password change on next login
+        })
+        .eq('id', voterToReset.id);
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        Platform.OS === 'web' ? alert(dbError.message) : Alert.alert("Error", dbError.message);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Log the password reset action
+      const { error: logError } = await supabase.from('admin_logs').insert({
+        action: "RESET_PASSWORD",
+        target_name: voterToReset.name,
+        target_id: voterToReset.student_id,
+        reason: `Password reset by admin. New password: ${generatedPassword}`,
+        admin_email: adminEmail,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (logError) {
+        console.error('Failed to add log:', logError);
+      }
+
+      // Refresh data
+      if (refreshData) {
+        await refreshData();
+      }
+
+      // Show the password with copy button
+      setIsPasswordReset(true);
+    } catch (e: any) {
+      const errorMsg = e.message || "An error occurred";
+      Platform.OS === 'web' ? alert(errorMsg) : Alert.alert("Error", errorMsg);
+    }
+    setIsProcessing(false);
   };
 
   const handleResetPassword = async () => {
@@ -174,6 +225,7 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
       setIsResetModalVisible(false);
       setVoterToReset(null);
       setNewResetPassword('');
+      setIsPasswordReset(false);
 
       const msg = `Password for ${voterToReset.name} has been reset successfully!`;
       Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
@@ -396,42 +448,62 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
           setIsResetModalVisible(false);
           setVoterToReset(null);
           setNewResetPassword('');
+          setIsPasswordReset(false);
         }}
       >
         <View className="flex-1 justify-center items-center bg-black/80 p-6">
           <View className="bg-[#1e1e1e] w-full p-6 rounded-3xl border border-gray-800">
-            <Text className="text-white text-xl font-bold mb-2">Reset Password</Text>
-            <Text className="text-gray-500 text-xs mb-4">
-              You are about to reset the password for <Text className="text-white font-bold">{voterToReset?.name}</Text> (ID: {voterToReset?.student_id}). A new password will be generated and the old password will be invalidated.
-            </Text>
-            
-            {/* Generated Password Display */}
-            <View className="bg-[#121212] p-4 rounded-xl mb-4 border border-gray-800">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-gray-500 text-[10px] uppercase font-bold">New Password</Text>
-                <TouchableOpacity 
-                  onPress={() => {
-                    Clipboard.setString(newResetPassword);
-                    Platform.OS === 'web' 
-                      ? alert('Password copied to clipboard!') 
-                      : Alert.alert('Copied', 'Password copied to clipboard!');
-                  }} 
-                  className="bg-[#f1c40f]/20 px-3 py-1 rounded"
-                >
-                  <Text className="text-[#f1c40f] text-[10px] font-bold">COPY</Text>
+            {!isPasswordReset ? (
+              <>
+                {/* Confirmation View - Before Reset */}
+                <Text className="text-white text-xl font-bold mb-2">Reset Password</Text>
+                <Text className="text-gray-500 text-xs mb-4">
+                  You are about to reset the password for <Text className="text-white font-bold">{voterToReset?.name}</Text> (ID: {voterToReset?.student_id}). A new password will be generated and the old password will be invalidated.
+                </Text>
+                
+                <Text className="text-gray-500 text-[10px] mb-6">The student will be required to change their password on next login.</Text>
+                
+                <View className="flex-row gap-3">
+                  <TouchableOpacity onPress={() => { setIsResetModalVisible(false); setVoterToReset(null); setNewResetPassword(''); setIsPasswordReset(false); }} className="flex-1 p-4 rounded-xl bg-gray-800 items-center"><Text className="text-white">Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={generateAndResetPassword} className="flex-1 p-4 rounded-xl bg-[#f1c40f] items-center">
+                    <Text className="text-black font-bold">Reset Password</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Password Generated View - After Reset */}
+                <Text className="text-white text-xl font-bold mb-2">Password Reset!</Text>
+                <Text className="text-gray-500 text-xs mb-4">
+                  Password for <Text className="text-white font-bold">{voterToReset?.name}</Text> has been reset successfully.
+                </Text>
+                
+                {/* Generated Password Display */}
+                <View className="bg-[#121212] p-4 rounded-xl mb-4 border border-gray-800">
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="text-gray-500 text-[10px] uppercase font-bold">New Password</Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        Clipboard.setString(newResetPassword);
+                        Platform.OS === 'web' 
+                          ? alert('Password copied to clipboard!') 
+                          : Alert.alert('Copied', 'Password copied to clipboard!');
+                      }} 
+                      className="bg-[#f1c40f]/20 px-3 py-1 rounded"
+                    >
+                      <Text className="text-[#f1c40f] text-[10px] font-bold">COPY</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text className="text-[#f1c40f] text-lg font-bold text-center tracking-widest">{newResetPassword}</Text>
+                </View>
+                
+                <Text className="text-gray-500 text-[10px] mb-6">Make sure to share this new password with the student.</Text>
+                
+                <TouchableOpacity onPress={() => { setIsResetModalVisible(false); setVoterToReset(null); setNewResetPassword(''); setIsPasswordReset(false); }} className="p-4 rounded-xl bg-gray-800 items-center">
+                  <Text className="text-white">Done</Text>
                 </TouchableOpacity>
-              </View>
-              <Text className="text-[#f1c40f] text-lg font-bold text-center tracking-widest">{newResetPassword}</Text>
-            </View>
-            
-            <Text className="text-gray-500 text-[10px] mb-4">Make sure to share this new password with the student.</Text>
-            
-            <View className="flex-row gap-3">
-              <TouchableOpacity onPress={() => { setIsResetModalVisible(false); setVoterToReset(null); setNewResetPassword(''); }} className="flex-1 p-4 rounded-xl bg-gray-800 items-center"><Text className="text-white">Cancel</Text></TouchableOpacity>
-              <TouchableOpacity onPress={handleResetPassword} disabled={isProcessing} className="flex-1 p-4 rounded-xl bg-[#f1c40f] items-center">
-                {isProcessing ? <ActivityIndicator color="black" /> : <Text className="text-black font-bold">Confirm Reset</Text>}
-              </TouchableOpacity>
-            </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
