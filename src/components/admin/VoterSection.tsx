@@ -182,60 +182,6 @@ export const VoterSection = ({ voters, handleDeleteItem, isProcessing, setIsProc
     setIsProcessing(false);
   };
 
-  const handleResetPassword = async () => {
-    if (!voterToReset) return;
-
-    setIsProcessing(true);
-    try {
-      // Update the password in the database and require password change
-      const { error: dbError } = await supabase
-        .from('users')
-        .update({ 
-          password: newResetPassword,
-          must_change_password: true // Force password change on next login
-        })
-        .eq('id', voterToReset.id);
-
-      if (dbError) {
-        console.error('Database error:', dbError);
-        Platform.OS === 'web' ? alert(dbError.message) : Alert.alert("Error", dbError.message);
-        setIsProcessing(false);
-        return;
-      }
-
-      // Log the password reset action
-      const { error: logError } = await supabase.from('admin_logs').insert({
-        action: "RESET_PASSWORD",
-        target_name: voterToReset.name,
-        target_id: voterToReset.student_id,
-        reason: `Password reset by admin. New password: ${newResetPassword}`,
-        admin_email: adminEmail,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (logError) {
-        console.error('Failed to add log:', logError);
-      }
-
-      // Refresh data
-      if (refreshData) {
-        await refreshData();
-      }
-
-      setIsResetModalVisible(false);
-      setVoterToReset(null);
-      setNewResetPassword('');
-      setIsPasswordReset(false);
-
-      const msg = `Password for ${voterToReset.name} has been reset successfully!`;
-      Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
-    } catch (e: any) {
-      const errorMsg = e.message || "An error occurred";
-      Platform.OS === 'web' ? alert(errorMsg) : Alert.alert("Error", errorMsg);
-    }
-    setIsProcessing(false);
-  };
-
   const handleFinalDelete = async () => {
     if (!removalReason.trim()) {
       Platform.OS === 'web' ? alert("Reason is required") : Alert.alert("Error", "Please provide a reason.");
