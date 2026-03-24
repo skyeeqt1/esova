@@ -6,6 +6,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy'; 
 import { decode } from 'base64-arraybuffer';
+import { Ionicons } from '@expo/vector-icons';
 
 // Configs
 import { supabase } from '../../config/supabase';
@@ -26,6 +27,41 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [positions, setPositions] = useState<string[]>([]);
+  const [positionsLoading, setPositionsLoading] = useState(true);
+  const [showAddPositionModal, setShowAddPositionModal] = useState(false);
+  const [newPositionName, setNewPositionName] = useState('');
+  const [editingPositionIndex, setEditingPositionIndex] = useState<number | null>(null);
+  const [editingPositionName, setEditingPositionName] = useState('');
+  const [showEditPositionModal, setShowEditPositionModal] = useState(false);
+
+  // Fetch positions from Supabase on mount
+  useEffect(() => {
+    const fetchPositions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('positions')
+          .select('name')
+          .order('name');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setPositions(data.map((p: any) => p.name));
+        } else {
+          // Fallback to default positions if table is empty
+          setPositions(POSITIONS);
+        }
+      } catch (error) {
+        console.error('Failed to fetch positions:', error);
+        setPositions(POSITIONS);
+      } finally {
+        setPositionsLoading(false);
+      }
+    };
+    
+    fetchPositions();
+  }, []);
 
   const initialState = {
     name: '', course: '', year: '', block: '', 
@@ -219,12 +255,73 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
         <TextInput placeholder="Full Name" placeholderTextColor="#444" value={form.name} onChangeText={(t) => setForm({...form, name: t})} className="bg-[#121212] text-white p-3 rounded-lg mb-3" />
         
         {/* ADDED POSITION SELECTION HERE */}
-        <Text className="text-gray-500 text-[10px] uppercase font-bold mb-2 ml-1">Select Position</Text>
+        <View className="flex-row items-center justify-between mb-2 ml-1">
+          <Text className="text-gray-500 text-[10px] uppercase font-bold">Select Position</Text>
+          <TouchableOpacity 
+            onPress={() => {
+              setShowAddPositionModal(true);
+            }}
+            className="flex-row items-center"
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#00b894" />
+            <Text className="text-[#00b894] text-[10px] ml-1 font-bold">Add</Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-4">
-          {POSITIONS.map((pos: string) => (
+          {positions.map((pos: string, index: number) => (
             <TouchableOpacity 
-              key={pos} 
+              key={pos + index} 
               onPress={() => setForm({...form, position: pos})}
+              onLongPress={() => {
+                Alert.alert(
+                  pos.toUpperCase(),
+                  'What would you like to do?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Edit', 
+                      onPress: () => {
+                        setEditingPositionIndex(index);
+                        setEditingPositionName(pos);
+                        setShowEditPositionModal(true);
+                      }
+                    },
+                    { 
+                      text: 'Delete', 
+                      style: 'destructive',
+                      onPress: () => {
+                        Alert.alert(
+                          'Delete Position',
+                          `Are you sure you want to delete "${pos}"?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Delete', 
+                              style: 'destructive',
+                              onPress: async () => {
+                                const newPositions = positions.filter((_, i) => i !== index);
+                                setPositions(newPositions);
+                                // Delete from database
+                                const { error: deleteError } = await supabase
+                                  .from('positions')
+                                  .delete()
+                                  .eq('name', pos);
+                                if (deleteError) {
+                                  console.error('Failed to delete position:', deleteError);
+                                  Alert.alert('Error', 'Failed to delete position');
+                                }
+                                if (form.position === pos) {
+                                  setForm({ ...form, position: newPositions[0] || 'President' });
+                                }
+                              }
+                            },
+                          ]
+                        );
+                      }
+                    },
+                  ]
+                );
+              }}
               className={`mr-2 px-4 py-2 rounded-full border ${
                 form.position === pos 
                   ? 'bg-[#00b894] border-[#00b894]' 
@@ -308,6 +405,120 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
             <TouchableOpacity onPress={() => setSelectedCandidate(null)} className="m-6 bg-[#333] p-4 rounded-xl items-center">
               <Text className="text-white font-bold">CLOSE</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- ADD POSITION MODAL --- */}
+      <Modal visible={showAddPositionModal} animationType="slide" transparent={true} onRequestClose={() => setShowAddPositionModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black/90 p-6">
+          <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 p-6">
+            <Text className="text-white text-xl font-bold mb-4 text-center">Add New Position</Text>
+            <TextInput
+              placeholder="Enter position name"
+              placeholderTextColor="#666"
+              value={newPositionName}
+              onChangeText={setNewPositionName}
+              className="bg-[#121212] text-white p-4 rounded-xl border border-gray-800 mb-4"
+            />
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowAddPositionModal(false);
+                  setNewPositionName('');
+                }}
+                className="flex-1 bg-[#333] p-4 rounded-xl items-center"
+              >
+                <Text className="text-white font-bold">CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (newPositionName && newPositionName.trim()) {
+                    const trimmed = newPositionName.trim();;
+                    if (positions.includes(trimmed)) {
+                      Alert.alert('Error', 'Position already exists');
+                    } else {
+                      setPositions([...positions, trimmed]);
+                      // Insert into database
+                      const { error: insertError } = await supabase
+                        .from('positions')
+                        .insert({ name: trimmed });
+                      if (insertError) {
+                        console.error('Failed to add position:', insertError);
+                        Alert.alert('Error', 'Failed to add position');
+                      }
+                      setForm({ ...form, position: trimmed });
+                      setShowAddPositionModal(false);
+                      setNewPositionName('');
+                    }
+                  }
+                }}
+                className="flex-1 bg-[#00b894] p-4 rounded-xl items-center"
+              >
+                <Text className="text-black font-bold">ADD</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- EDIT POSITION MODAL --- */}
+      <Modal visible={showEditPositionModal} animationType="slide" transparent={true} onRequestClose={() => setShowEditPositionModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black/90 p-6">
+          <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 p-6">
+            <Text className="text-white text-xl font-bold mb-4 text-center">Edit Position</Text>
+            <TextInput
+              placeholder="Enter new position name"
+              placeholderTextColor="#666"
+              value={editingPositionName}
+              onChangeText={setEditingPositionName}
+              className="bg-[#121212] text-white p-4 rounded-xl border border-gray-800 mb-4"
+            />
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowEditPositionModal(false);
+                  setEditingPositionIndex(null);
+                  setEditingPositionName('');
+                }}
+                className="flex-1 bg-[#333] p-4 rounded-xl items-center"
+              >
+                <Text className="text-white font-bold">CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (editingPositionName && editingPositionName.trim()) {
+                    const trimmed = editingPositionName.trim();
+                    if (positions.includes(trimmed)) {
+                      Alert.alert('Error', 'Position already exists');
+                    } else if (editingPositionIndex !== null) {
+                      const oldName = positions[editingPositionIndex];
+                      const newPositions = [...positions];
+                      newPositions[editingPositionIndex] = trimmed;
+                      setPositions(newPositions);
+                      // Update in database
+                      const { error: updateError } = await supabase
+                        .from('positions')
+                        .update({ name: trimmed })
+                        .eq('name', oldName);
+                      if (updateError) {
+                        console.error('Failed to update position:', updateError);
+                        Alert.alert('Error', 'Failed to update position');
+                      }
+                      if (form.position === oldName) {
+                        setForm({ ...form, position: trimmed });
+                      }
+                      setShowEditPositionModal(false);
+                      setEditingPositionIndex(null);
+                      setEditingPositionName('');
+                    }
+                  }
+                }}
+                className="flex-1 bg-[#3498db] p-4 rounded-xl items-center"
+              >
+                <Text className="text-white font-bold">SAVE</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

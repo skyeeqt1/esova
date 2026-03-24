@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // Color mapping for different action types
 export const getActionColor = (action: string) => {
@@ -13,6 +14,30 @@ export const getActionColor = (action: string) => {
 };
 
 export const AdminLogsSection = ({ logs }: { logs: any[] }) => {
+  const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
+
+  const togglePasswordReveal = (logId: string) => {
+    setRevealedPasswords((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(logId)) {
+        newSet.delete(logId);
+      } else {
+        newSet.add(logId);
+      }
+      return newSet;
+    });
+  };
+
+  // Check if reason contains password (for password reset logs)
+  const hasPassword = (reason: string) => {
+    return reason && reason.includes('New password:');
+  };
+
+  // Mask the password in reason string
+  const maskPassword = (reason: string) => {
+    return reason.replace(/New password: .+/, 'New password: ●●●●●●');
+  };
+
   // Helper to format timestamp (Supabase returns ISO string)
   const formatTimestamp = (timestamp: string) => {
     if (!timestamp) return '';
@@ -71,7 +96,25 @@ export const AdminLogsSection = ({ logs }: { logs: any[] }) => {
                 </Text>
               )}
               {log.reason && (
-                <Text className="text-gray-500 text-[10px] italic mt-1">"{log.reason}"</Text>
+                hasPassword(log.reason) ? (
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-gray-500 text-[10px] italic">
+                      {revealedPasswords.has(log.id) ? log.reason : maskPassword(log.reason)}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => togglePasswordReveal(log.id)}
+                      className="ml-1 p-1"
+                    >
+                      <Ionicons
+                        name={revealedPasswords.has(log.id) ? 'eye-off' : 'eye'}
+                        size={14}
+                        color="#3498db"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <Text className="text-gray-500 text-[10px] italic mt-1">"{log.reason}"</Text>
+                )
               )}
               {log.admin_email && (
                 <Text className="text-[#f1c40f] text-[10px] font-medium mt-1">By: {log.admin_email}</Text>
