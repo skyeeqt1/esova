@@ -5,9 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './src/screens/LoginScreen';
 import AdminDashboard from './src/screens/AdminDashboard';
 import VoterScreen from './src/screens/VoterScreen';
-import VoterProfile from './src/screens/VoterProfile';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
-import "./global.css";
+import './global.css';
 
 const Stack = createNativeStackNavigator();
 
@@ -43,16 +42,14 @@ export default function App() {
   return (
     <NavigationContainer>
       <BackButtonHandler />
-      <Stack.Navigator 
-        screenOptions={{ 
+      <Stack.Navigator
+        screenOptions={{
           headerShown: false,
-          animation: 'slide_from_right' 
-        }}
-      >
+          animation: 'slide_from_right',
+        }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
         <Stack.Screen name="VoterScreen" component={VoterScreen} />
-        <Stack.Screen name="VoterProfile" component={VoterProfile} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
