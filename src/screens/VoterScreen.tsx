@@ -424,7 +424,7 @@ const VoterScreen = ({ navigation, route }: any) => {
           {isEnded && !showReceiptOverride ? (
             <View>
               {electionSettings?.results_published ? (
-                /* OFFICIAL RESULTS PANEL */
+                /* OFFICIAL RESULTS PANEL - SHOWS ALL CANDIDATES WITH VOTES */
                 <View className="rounded-3xl border border-[#f1c40f] bg-[#1e1e1e] p-6">
                   <Text className="mb-6 text-center text-2xl font-black italic text-[#f1c40f]">
                     OFFICIAL RESULTS
@@ -433,20 +433,43 @@ const VoterScreen = ({ navigation, route }: any) => {
                     const sorted = candidates
                       .filter((c) => c.position === pos)
                       .sort((a, b) => b.votes - a.votes);
-                    const winner = sorted[0];
                     return (
-                      <View
-                        key={pos}
-                        className="mb-3 flex-row items-center justify-between rounded-xl bg-black/50 p-4">
-                        <View>
-                          <Text className="text-[8px] font-bold uppercase text-gray-500">
-                            {pos} Winner
-                          </Text>
-                          <Text className="font-bold text-white">{winner?.name || 'N/A'}</Text>
-                        </View>
-                        <Text className="text-lg font-black text-[#ffff00]">
-                          {winner?.votes || 0}
+                      <View key={pos} className="mb-6">
+                        <Text className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-[#00b894]">
+                          {pos}
                         </Text>
+                        {sorted.map((cand, index) => {
+                          const isWinner = index === 0;
+                          return (
+                            <View
+                              key={cand.id}
+                              className={`mb-2 flex-row items-center justify-between rounded-xl p-3 ${isWinner ? 'border border-[#00b894] bg-[#00b894]/20' : 'border border-gray-800 bg-black/50'}`}>
+                              <View className="flex-1 flex-row items-center">
+                                <Text
+                                  className={`mr-2 text-lg font-bold ${isWinner ? 'text-[#00b894]' : 'text-gray-400'}`}>
+                                  {index + 1}.
+                                </Text>
+                                <View>
+                                  <Text
+                                    className={`font-bold ${isWinner ? 'text-[#00b894]' : 'text-white'}`}>
+                                    {cand.name}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View className="items-end">
+                                <Text
+                                  className={`text-lg font-black ${isWinner ? 'text-[#ffff00]' : 'text-gray-400'}`}>
+                                  {cand.votes || 0}
+                                </Text>
+                                {isWinner && (
+                                  <Text className="text-[8px] font-bold text-[#00b894]">
+                                    WINNER
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     );
                   })}
