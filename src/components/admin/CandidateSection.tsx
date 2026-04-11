@@ -1,10 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, Image, 
-  ScrollView, ActivityIndicator, Platform, Modal, Alert, BackHandler
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+  Modal,
+  Alert,
+  BackHandler,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy'; 
+import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,7 +32,14 @@ interface Props {
   onRefresh?: () => void;
 }
 
-export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, setIsProcessing, refreshData, adminEmail }: any) => {
+export const CandidateSection = ({
+  candidates,
+  handleDeleteItem,
+  isProcessing,
+  setIsProcessing,
+  refreshData,
+  adminEmail,
+}: any) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,13 +55,10 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   useEffect(() => {
     const fetchPositions = async () => {
       try {
-        const { data, error } = await supabase
-          .from('positions')
-          .select('name')
-          .order('name');
-        
+        const { data, error } = await supabase.from('positions').select('name').order('name');
+
         if (error) throw error;
-        
+
         if (data && data.length > 0) {
           setPositions(data.map((p: any) => p.name));
         } else {
@@ -59,15 +72,21 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
         setPositionsLoading(false);
       }
     };
-    
+
     fetchPositions();
   }, []);
 
   const initialState = {
-    name: '', course: '', year: '', block: '', 
-    age: '', gender: '', background: '', position: 'President'
+    name: '',
+    course: '',
+    year: '',
+    block: '',
+    age: '',
+    gender: '',
+    background: '',
+    position: 'President',
   };
-  
+
   const [form, setForm] = useState(initialState);
   const [candImage, setCandImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<any>(null);
@@ -87,9 +106,10 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
 
   // --- SEARCH LOGIC ---
   const filteredCandidates = useMemo(() => {
-    return candidates.filter((c: any) => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.position.toLowerCase().includes(searchTerm.toLowerCase())
+    return candidates.filter(
+      (c: any) =>
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.position.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, candidates]);
 
@@ -99,9 +119,9 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
       const fileName = `profile_${Date.now()}.png`;
       const filePath = `candidates/${fileName}`;
       let body;
-      
+
       if (Platform.OS === 'web') {
-        body = imageFile; 
+        body = imageFile;
       } else {
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
         body = decode(base64);
@@ -112,19 +132,21 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
         .upload(filePath, body, { contentType: 'image/png', upsert: true });
 
       if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('candidate-images').getPublicUrl(filePath);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('candidate-images').getPublicUrl(filePath);
       return publicUrl;
     } catch (err: any) {
-      throw new Error(err.message || "Upload failed.");
+      throw new Error(err.message || 'Upload failed.');
     }
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return Alert.alert("Denied", "Gallery access needed.");
+    if (status !== 'granted') return Alert.alert('Denied', 'Gallery access needed.');
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], 
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.3,
@@ -141,85 +163,84 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.course) return Alert.alert("Error", "Name and Course are required.");
+    if (!form.name || !form.course) return Alert.alert('Error', 'Name and Course are required.');
     setIsProcessing(true);
     try {
       let finalImageUrl = candImage || DEFAULT_AVATAR;
-      const isNewLocalFile = candImage && (candImage.startsWith('file:') || candImage.startsWith('content:') || candImage.startsWith('ph:'));
+      const isNewLocalFile =
+        candImage &&
+        (candImage.startsWith('file:') ||
+          candImage.startsWith('content:') ||
+          candImage.startsWith('ph:'));
 
       if (isNewLocalFile) finalImageUrl = await uploadToSupabase(candImage);
 
       const payload = { ...form, image: finalImageUrl };
-      
+
       if (editingId) {
         // Update existing candidate
-        const { error } = await supabase
-          .from('candidates')
-          .update(payload)
-          .eq('id', editingId);
-        
+        const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
+
         if (error) throw error;
-        
+
         // Log the update action
         const { error: logError } = await supabase.from('admin_logs').insert({
-          action: "UPDATE_CANDIDATE",
+          action: 'UPDATE_CANDIDATE',
           target_name: form.name,
           target_id: form.position,
           reason: `Updated candidate details - Course: ${form.course}, Year: ${form.year}`,
           admin_email: adminEmail,
           timestamp: new Date().toISOString(),
         });
-        
+
         if (logError) {
           console.error('Failed to add log:', logError);
-          Alert.alert("Log Error", "Could not add activity log: " + logError.message);
+          Alert.alert('Log Error', 'Could not add activity log: ' + logError.message);
         }
-        
+
         // Refresh data immediately after update
         if (refreshData) {
           await refreshData();
         }
-        
-        Alert.alert("Updated", "Candidate information synced.");
+
+        Alert.alert('Updated', 'Candidate information synced.');
       } else {
         // Add new candidate
-        const { error } = await supabase
-          .from('candidates')
-          .insert({ ...payload, votes: 0 });
-        
+        const { error } = await supabase.from('candidates').insert({ ...payload, votes: 0 });
+
         if (error) throw error;
-        
+
         // Log the addition
         const { error: logError } = await supabase.from('admin_logs').insert({
-          action: "ADD_CANDIDATE",
+          action: 'ADD_CANDIDATE',
           target_name: form.name,
           target_id: form.position,
           reason: `New candidate registered - Course: ${form.course}, Year: ${form.year}`,
           admin_email: adminEmail,
           timestamp: new Date().toISOString(),
         });
-        
+
         if (logError) {
           console.error('Failed to add log:', logError);
-          Alert.alert("Log Error", "Could not add activity log: " + logError.message);
+          Alert.alert('Log Error', 'Could not add activity log: ' + logError.message);
         }
-        
+
         // Refresh logs to show new entry
         if (refreshData) {
           await refreshData();
         }
-        
-        Alert.alert("Registered", "New candidate added.");
+
+        Alert.alert('Registered', 'New candidate added.');
       }
-      
+
       // Refresh data immediately after save
       if (refreshData) {
         await refreshData();
       }
-      
+
       resetForm();
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Alert.alert('Error', e.message);
     } finally {
       setIsProcessing(false);
     }
@@ -227,11 +248,11 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
 
   const confirmDelete = (id: string) => {
     Alert.alert(
-      "Remove Candidate",
-      "Are you sure you want to delete this candidate? This cannot be undone.",
+      'Remove Candidate',
+      'Are you sure you want to delete this candidate? This cannot be undone.',
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => handleDeleteItem("candidates", id) }
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => handleDeleteItem('candidates', id) },
       ]
     );
   };
@@ -246,180 +267,275 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   return (
     <View className="flex-1">
       {/* --- REGISTRATION FORM --- */}
-      <View className="bg-[#1e1e1e] p-5 rounded-2xl border border-gray-800 mb-6">
-        <TouchableOpacity onPress={pickImage} className="items-center mb-4">
-          <Image source={{ uri: candImage || DEFAULT_AVATAR }} className="w-20 h-20 rounded-full border-2 border-[#00b894]" />
-          <Text className="text-[#00b894] text-[10px] font-bold mt-2 uppercase">Tap to Upload Photo</Text>
+      <View className="mb-6 rounded-2xl border border-gray-800 bg-[#1e1e1e] p-5">
+        <TouchableOpacity onPress={pickImage} className="mb-4 items-center">
+          <Image
+            source={{ uri: candImage || DEFAULT_AVATAR }}
+            className="h-24 w-24 rounded-full border-2 border-[#00b894]"
+          />
+          <Text className="mt-2 text-base font-bold uppercase text-[#00b894]">
+            Tap to Upload Photo
+          </Text>
         </TouchableOpacity>
-        
-        <TextInput placeholder="Full Name" placeholderTextColor="#444" value={form.name} onChangeText={(t) => setForm({...form, name: t})} className="bg-[#121212] text-white p-3 rounded-lg mb-3" />
-        
+
+        <TextInput
+          placeholder="Full Name"
+          placeholderTextColor="#444"
+          value={form.name}
+          onChangeText={(t) => setForm({ ...form, name: t })}
+          className="mb-3 rounded-lg bg-[#121212] p-4 text-lg text-white"
+        />
+
         {/* ADDED POSITION SELECTION HERE */}
-        <View className="flex-row items-center justify-between mb-2 ml-1">
-          <Text className="text-gray-500 text-[10px] uppercase font-bold">Select Position</Text>
-          <TouchableOpacity 
+        <View className="mb-2 ml-1 flex-row items-center justify-between">
+          <Text className="text-base font-bold uppercase text-gray-500">Select Position</Text>
+          <TouchableOpacity
             onPress={() => {
               setShowAddPositionModal(true);
             }}
-            className="flex-row items-center"
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#00b894" />
-            <Text className="text-[#00b894] text-[10px] ml-1 font-bold">Add</Text>
+            className="flex-row items-center">
+            <Ionicons name="add-circle-outline" size={22} color="#00b894" />
+            <Text className="ml-1 text-base font-bold text-[#00b894]">Add</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 flex-row">
           {positions.map((pos: string, index: number) => (
-            <TouchableOpacity 
-              key={pos + index} 
-              onPress={() => setForm({...form, position: pos})}
+            <TouchableOpacity
+              key={pos + index}
+              onPress={() => setForm({ ...form, position: pos })}
               onLongPress={() => {
-                Alert.alert(
-                  pos.toUpperCase(),
-                  'What would you like to do?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Edit', 
-                      onPress: () => {
-                        setEditingPositionIndex(index);
-                        setEditingPositionName(pos);
-                        setShowEditPositionModal(true);
-                      }
+                Alert.alert(pos.toUpperCase(), 'What would you like to do?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Edit',
+                    onPress: () => {
+                      setEditingPositionIndex(index);
+                      setEditingPositionName(pos);
+                      setShowEditPositionModal(true);
                     },
-                    { 
-                      text: 'Delete', 
-                      style: 'destructive',
-                      onPress: () => {
-                        Alert.alert(
-                          'Delete Position',
-                          `Are you sure you want to delete "${pos}"?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { 
-                              text: 'Delete', 
-                              style: 'destructive',
-                              onPress: async () => {
-                                const newPositions = positions.filter((_, i) => i !== index);
-                                setPositions(newPositions);
-                                // Delete from database
-                                const { error: deleteError } = await supabase
-                                  .from('positions')
-                                  .delete()
-                                  .eq('name', pos);
-                                if (deleteError) {
-                                  console.error('Failed to delete position:', deleteError);
-                                  Alert.alert('Error', 'Failed to delete position');
-                                }
-                                if (form.position === pos) {
-                                  setForm({ ...form, position: newPositions[0] || 'President' });
-                                }
-                              }
-                            },
-                          ]
-                        );
-                      }
+                  },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                      Alert.alert('Delete Position', `Are you sure you want to delete "${pos}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            const newPositions = positions.filter((_, i) => i !== index);
+                            setPositions(newPositions);
+                            // Delete from database
+                            const { error: deleteError } = await supabase
+                              .from('positions')
+                              .delete()
+                              .eq('name', pos);
+                            if (deleteError) {
+                              console.error('Failed to delete position:', deleteError);
+                              Alert.alert('Error', 'Failed to delete position');
+                            }
+                            if (form.position === pos) {
+                              setForm({ ...form, position: newPositions[0] || 'President' });
+                            }
+                          },
+                        },
+                      ]);
                     },
-                  ]
-                );
+                  },
+                ]);
               }}
-              className={`mr-2 px-4 py-2 rounded-full border ${
-                form.position === pos 
-                  ? 'bg-[#00b894] border-[#00b894]' 
-                  : 'bg-[#121212] border-gray-800'
-              }`}
-            >
-              <Text className={`text-[10px] font-bold ${form.position === pos ? 'text-black' : 'text-gray-400'}`}>
+              className={`mr-2 rounded-full border px-4 py-2 ${
+                form.position === pos
+                  ? 'border-[#00b894] bg-[#00b894]'
+                  : 'border-gray-800 bg-[#121212]'
+              }`}>
+              <Text
+                className={`text-base font-bold ${form.position === pos ? 'text-black' : 'text-gray-400'}`}>
                 {pos.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <View className="flex-row gap-2 mb-3">
-          <TextInput placeholder="Course" placeholderTextColor="#444" value={form.course} onChangeText={(t) => setForm({...form, course: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
-          <TextInput placeholder="Year" placeholderTextColor="#444" value={form.year} onChangeText={(t) => setForm({...form, year: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
-          <TextInput placeholder="Block" placeholderTextColor="#444" value={form.block} onChangeText={(t) => setForm({...form, block: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+        <View className="mb-3 flex-row gap-2">
+          <TextInput
+            placeholder="Course"
+            placeholderTextColor="#444"
+            value={form.course}
+            onChangeText={(t) => setForm({ ...form, course: t })}
+            className="flex-1 rounded-lg bg-[#121212] p-4 text-lg text-white"
+          />
+          <TextInput
+            placeholder="Year"
+            placeholderTextColor="#444"
+            value={form.year}
+            onChangeText={(t) => setForm({ ...form, year: t })}
+            className="flex-1 rounded-lg bg-[#121212] p-4 text-lg text-white"
+          />
+          <TextInput
+            placeholder="Block"
+            placeholderTextColor="#444"
+            value={form.block}
+            onChangeText={(t) => setForm({ ...form, block: t })}
+            className="flex-1 rounded-lg bg-[#121212] p-4 text-lg text-white"
+          />
         </View>
-        <View className="flex-row gap-2 mb-3">
-          <TextInput placeholder="Age" placeholderTextColor="#444" value={form.age} onChangeText={(t) => setForm({...form, age: t})} keyboardType="numeric" className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
-          <TextInput placeholder="Gender" placeholderTextColor="#444" value={form.gender} onChangeText={(t) => setForm({...form, gender: t})} className="flex-1 bg-[#121212] text-white p-3 rounded-lg" />
+        <View className="mb-3 flex-row gap-2">
+          <TextInput
+            placeholder="Age"
+            placeholderTextColor="#444"
+            value={form.age}
+            onChangeText={(t) => setForm({ ...form, age: t })}
+            keyboardType="numeric"
+            className="flex-1 rounded-lg bg-[#121212] p-4 text-lg text-white"
+          />
+          <TextInput
+            placeholder="Gender"
+            placeholderTextColor="#444"
+            value={form.gender}
+            onChangeText={(t) => setForm({ ...form, gender: t })}
+            className="flex-1 rounded-lg bg-[#121212] p-4 text-lg text-white"
+          />
         </View>
-        <TextInput placeholder="Achievements & Background" placeholderTextColor="#444" value={form.background} onChangeText={(t) => setForm({...form, background: t})} multiline className="bg-[#121212] text-white p-3 rounded-lg mb-4 h-20" />
-        <TouchableOpacity onPress={handleSave} className="bg-[#00b894] p-4 rounded-xl items-center">
-          {isProcessing ? <ActivityIndicator color="black" /> : <Text className="text-black font-bold uppercase">{editingId ? "Update Candidate" : "Register Candidate"}</Text>}
+        <TextInput
+          placeholder="Achievements & Background"
+          placeholderTextColor="#444"
+          value={form.background}
+          onChangeText={(t) => setForm({ ...form, background: t })}
+          multiline
+          className="mb-4 h-24 rounded-lg bg-[#121212] p-4 text-lg text-white"
+        />
+        <TouchableOpacity onPress={handleSave} className="items-center rounded-xl bg-[#00b894] p-4">
+          {isProcessing ? (
+            <ActivityIndicator color="black" />
+          ) : (
+            <Text className="text-lg font-bold uppercase text-black">
+              {editingId ? 'Update Candidate' : 'Register Candidate'}
+            </Text>
+          )}
         </TouchableOpacity>
-        {editingId && <TouchableOpacity onPress={resetForm} className="mt-2 items-center"><Text className="text-gray-500 text-xs">Cancel Edit</Text></TouchableOpacity>}
+        {editingId && (
+          <TouchableOpacity onPress={resetForm} className="mt-2 items-center">
+            <Text className="text-base text-gray-500">Cancel Edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* --- SEARCH BAR --- */}
       <View className="mb-4">
-        <TextInput 
-          placeholder="Search by name or position..." 
-          placeholderTextColor="#666" 
+        <TextInput
+          placeholder="Search by name or position..."
+          placeholderTextColor="#666"
           value={searchTerm}
           onChangeText={setSearchTerm}
-          className="bg-[#1e1e1e] text-white p-4 rounded-xl border border-gray-800"
+          className="rounded-xl border border-gray-800 bg-[#1e1e1e] p-4 text-lg text-white"
         />
       </View>
 
       {/* --- LIST SECTION --- */}
       {filteredCandidates.map((c: any) => (
-        <View key={c.id} className="bg-[#1e1e1e] p-4 rounded-xl mb-3 flex-row items-center border border-gray-800">
-          <Image source={{ uri: c.image || DEFAULT_AVATAR }} className="w-16 h-16 rounded-full mr-1" />
+        <TouchableOpacity
+          key={c.id}
+          onPress={() => setSelectedCandidate(c)}
+          className="mb-3 flex-row items-center rounded-xl border border-gray-800 bg-[#1e1e1e] p-4">
+          <Image
+            source={{ uri: c.image || DEFAULT_AVATAR }}
+            className="mr-3 h-20 w-20 rounded-full"
+          />
           <View className="flex-1">
-            <Text className="text-white font-bold">{c.name}</Text>
-            <Text className="text-[#00b894] text-[10px] uppercase font-semibold">{c.position}</Text>
+            <Text className="text-xl font-bold text-white" numberOfLines={1}>
+              {c.name}
+            </Text>
+            <Text className="text-base font-semibold uppercase text-[#00b894]">{c.position}</Text>
           </View>
-          
-          <View className="flex-row gap-4">
-            <TouchableOpacity onPress={() => setSelectedCandidate(c)}><Text className="text-[#00b894] text-xs font-bold">VIEW</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => { setEditingId(c.id); setForm({ ...c }); setCandImage(c.image); }}><Text className="text-blue-500 text-xs font-bold">EDIT</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => confirmDelete(c.id)}><Text className="text-red-500 text-xs font-bold">DELETE</Text></TouchableOpacity>
-          </View>
-        </View>
+        </TouchableOpacity>
       ))}
 
       {filteredCandidates.length === 0 && (
-        <Text className="text-gray-600 text-center mt-4">No candidates found.</Text>
+        <Text className="mt-4 text-center text-lg text-gray-600">No candidates found.</Text>
       )}
 
       {/* --- DETAIL MODAL (Functional) --- */}
-      <Modal visible={!!selectedCandidate} animationType="slide" transparent={true} onRequestClose={() => setSelectedCandidate(null)}>
-        <View className="flex-1 justify-center items-center bg-black/90 p-6">
-          <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 overflow-hidden">
-            <View className="items-center p-6 bg-[#252525]">
-               <Image source={{ uri: selectedCandidate?.image || DEFAULT_AVATAR }} className="w-40 h-40 rounded-2xl border-2 border-[#00b894]" />
-               <Text className="text-white text-2xl font-bold mt-4">{selectedCandidate?.name}</Text>
-               <Text className="text-[#00b894] font-bold uppercase tracking-widest text-xs">{selectedCandidate?.position}</Text>
+      <Modal
+        visible={!!selectedCandidate}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedCandidate(null)}>
+        <View className="flex-1 items-center justify-center bg-black/90 p-6">
+          <View className="w-full overflow-hidden rounded-3xl border border-gray-800 bg-[#1e1e1e]">
+            <View className="items-center bg-[#252525] p-6">
+              <Image
+                source={{ uri: selectedCandidate?.image || DEFAULT_AVATAR }}
+                className="h-48 w-48 rounded-2xl border-2 border-[#00b894]"
+              />
+              <Text className="mt-4 text-3xl font-bold text-white">{selectedCandidate?.name}</Text>
+              <Text className="text-base font-bold uppercase tracking-widest text-[#00b894]">
+                {selectedCandidate?.position}
+              </Text>
             </View>
 
-            <ScrollView className="p-6 max-h-80">
-                <DetailRow label="Academic" value={`${selectedCandidate?.course} • Yr ${selectedCandidate?.year}-${selectedCandidate?.block}`} />
-                <DetailRow label="Personal" value={`${selectedCandidate?.age} y/o • ${selectedCandidate?.gender}`} />
-                <View className="mt-4">
-                    <Text className="text-gray-500 text-[10px] uppercase font-bold">Biography</Text>
-                    <Text className="text-gray-300 mt-2 leading-5">{selectedCandidate?.background || "No bio provided."}</Text>
-                </View>
+            <ScrollView className="max-h-80 p-6">
+              <DetailRow
+                label="Academic"
+                value={`${selectedCandidate?.course} • Yr ${selectedCandidate?.year}-${selectedCandidate?.block}`}
+              />
+              <DetailRow
+                label="Personal"
+                value={`${selectedCandidate?.age} y/o • ${selectedCandidate?.gender}`}
+              />
+              <View className="mt-4">
+                <Text className="text-base font-bold uppercase text-gray-500">Biography</Text>
+                <Text className="mt-2 text-lg leading-5 text-gray-300">
+                  {selectedCandidate?.background || 'No bio provided.'}
+                </Text>
+              </View>
             </ScrollView>
 
-            <TouchableOpacity onPress={() => setSelectedCandidate(null)} className="m-6 bg-[#333] p-4 rounded-xl items-center">
-              <Text className="text-white font-bold">CLOSE</Text>
+            <View className="mx-6 flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedCandidate(null);
+                  setEditingId(selectedCandidate.id);
+                  setForm({ ...selectedCandidate });
+                  setCandImage(selectedCandidate.image);
+                }}
+                className="flex-1 items-center rounded-xl bg-blue-600 p-4">
+                <Text className="text-lg font-bold text-white">EDIT</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedCandidate(null);
+                  confirmDelete(selectedCandidate.id);
+                }}
+                className="flex-1 items-center rounded-xl border border-red-500 bg-red-500/10 p-4">
+                <Text className="text-lg font-bold text-red-500">DELETE</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              onPress={() => setSelectedCandidate(null)}
+              className="m-6 items-center rounded-xl bg-[#333] p-4">
+              <Text className="text-lg font-bold text-white">CLOSE</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       {/* --- ADD POSITION MODAL --- */}
-      <Modal visible={showAddPositionModal} animationType="slide" transparent={true} onRequestClose={() => setShowAddPositionModal(false)}>
-        <View className="flex-1 justify-center items-center bg-black/90 p-6">
-          <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 p-6">
-            <Text className="text-white text-xl font-bold mb-4 text-center">Add New Position</Text>
+      <Modal
+        visible={showAddPositionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddPositionModal(false)}>
+        <View className="flex-1 items-center justify-center bg-black/90 p-6">
+          <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
+            <Text className="mb-4 text-center text-2xl font-bold text-white">Add New Position</Text>
             <TextInput
               placeholder="Enter position name"
               placeholderTextColor="#666"
               value={newPositionName}
               onChangeText={setNewPositionName}
-              className="bg-[#121212] text-white p-4 rounded-xl border border-gray-800 mb-4"
+              className="mb-4 rounded-xl border border-gray-800 bg-[#121212] p-4 text-lg text-white"
             />
             <View className="flex-row gap-3">
               <TouchableOpacity
@@ -427,14 +543,13 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
                   setShowAddPositionModal(false);
                   setNewPositionName('');
                 }}
-                className="flex-1 bg-[#333] p-4 rounded-xl items-center"
-              >
-                <Text className="text-white font-bold">CANCEL</Text>
+                className="flex-1 items-center rounded-xl bg-[#333] p-4">
+                <Text className="text-lg font-bold text-white">CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={async () => {
                   if (newPositionName && newPositionName.trim()) {
-                    const trimmed = newPositionName.trim();;
+                    const trimmed = newPositionName.trim();
                     if (positions.includes(trimmed)) {
                       Alert.alert('Error', 'Position already exists');
                     } else {
@@ -453,9 +568,8 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
                     }
                   }
                 }}
-                className="flex-1 bg-[#00b894] p-4 rounded-xl items-center"
-              >
-                <Text className="text-black font-bold">ADD</Text>
+                className="flex-1 items-center rounded-xl bg-[#00b894] p-4">
+                <Text className="text-lg font-bold text-black">ADD</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -463,16 +577,20 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
       </Modal>
 
       {/* --- EDIT POSITION MODAL --- */}
-      <Modal visible={showEditPositionModal} animationType="slide" transparent={true} onRequestClose={() => setShowEditPositionModal(false)}>
-        <View className="flex-1 justify-center items-center bg-black/90 p-6">
-          <View className="bg-[#1e1e1e] w-full rounded-3xl border border-gray-800 p-6">
-            <Text className="text-white text-xl font-bold mb-4 text-center">Edit Position</Text>
+      <Modal
+        visible={showEditPositionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditPositionModal(false)}>
+        <View className="flex-1 items-center justify-center bg-black/90 p-6">
+          <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
+            <Text className="mb-4 text-center text-2xl font-bold text-white">Edit Position</Text>
             <TextInput
               placeholder="Enter new position name"
               placeholderTextColor="#666"
               value={editingPositionName}
               onChangeText={setEditingPositionName}
-              className="bg-[#121212] text-white p-4 rounded-xl border border-gray-800 mb-4"
+              className="mb-4 rounded-xl border border-gray-800 bg-[#121212] p-4 text-lg text-white"
             />
             <View className="flex-row gap-3">
               <TouchableOpacity
@@ -481,9 +599,8 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
                   setEditingPositionIndex(null);
                   setEditingPositionName('');
                 }}
-                className="flex-1 bg-[#333] p-4 rounded-xl items-center"
-              >
-                <Text className="text-white font-bold">CANCEL</Text>
+                className="flex-1 items-center rounded-xl bg-[#333] p-4">
+                <Text className="text-lg font-bold text-white">CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={async () => {
@@ -514,9 +631,8 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
                     }
                   }
                 }}
-                className="flex-1 bg-[#3498db] p-4 rounded-xl items-center"
-              >
-                <Text className="text-white font-bold">SAVE</Text>
+                className="flex-1 items-center rounded-xl bg-[#3498db] p-4">
+                <Text className="text-lg font-bold text-white">SAVE</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -526,9 +642,9 @@ export const CandidateSection = ({ candidates, handleDeleteItem, isProcessing, s
   );
 };
 
-const DetailRow = ({ label, value }: { label: string, value: string }) => (
+const DetailRow = ({ label, value }: { label: string; value: string }) => (
   <View className="flex-row justify-between border-b border-gray-800 py-3">
-    <Text className="text-gray-500 text-[11px] uppercase">{label}</Text>
-    <Text className="text-white text-xs font-bold">{value}</Text>
+    <Text className="text-base uppercase text-gray-500">{label}</Text>
+    <Text className="text-base font-bold text-white">{value}</Text>
   </View>
 );

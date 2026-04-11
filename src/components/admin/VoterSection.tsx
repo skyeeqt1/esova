@@ -332,7 +332,7 @@ export const VoterSection = ({
     <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
       {/* ADD STUDENT FORM */}
       <View className="mb-6 rounded-2xl border border-gray-800 bg-[#1e1e1e] p-5">
-        <Text className="mb-4 text-xs font-bold uppercase tracking-widest text-[#00b894]">
+        <Text className="mb-4 text-lg font-bold uppercase tracking-widest text-[#00b894]">
           Register Student
         </Text>
         <TextInput
@@ -340,7 +340,7 @@ export const VoterSection = ({
           placeholderTextColor="#444"
           value={voterName}
           onChangeText={setVoterName}
-          className="mb-3 rounded-lg border border-gray-800 bg-[#121212] p-3 text-white"
+          className="mb-3 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
         />
         <View className="mb-3 flex-row gap-2">
           <TextInput
@@ -348,14 +348,14 @@ export const VoterSection = ({
             placeholderTextColor="#444"
             value={voterID}
             onChangeText={setVoterID}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-3 text-white"
+            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
           />
           <TextInput
             placeholder="Email"
             placeholderTextColor="#444"
             value={voterEmail}
             onChangeText={setVoterEmail}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-3 text-white"
+            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
           />
         </View>
         <View className="mb-4 flex-row gap-2">
@@ -364,12 +364,12 @@ export const VoterSection = ({
             placeholderTextColor="#444"
             value={voterPassword}
             onChangeText={setVoterPassword}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-3 text-white"
+            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
           />
           <TouchableOpacity
             onPress={generateRandomPassword}
             className="items-center justify-center rounded-lg bg-[#f1c40f] px-4">
-            <Text className="text-xs font-bold text-black">GENERATE</Text>
+            <Text className="text-base font-bold text-black">GENERATE</Text>
           </TouchableOpacity>
         </View>
 
@@ -380,7 +380,7 @@ export const VoterSection = ({
           {isProcessing ? (
             <ActivityIndicator color="black" />
           ) : (
-            <Text className="font-bold uppercase text-black">Add Voter</Text>
+            <Text className="text-base font-bold uppercase text-black">Add Voter</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -392,40 +392,34 @@ export const VoterSection = ({
         placeholder="Search students..."
         placeholderTextColor="#444"
         onChangeText={setSearchQuery}
-        className="mb-4 rounded-xl border border-gray-800 bg-[#1e1e1e] p-4 text-white"
+        className="mb-4 rounded-xl border border-gray-800 bg-[#1e1e1e] p-4 text-lg text-white"
       />
 
       {/* VOTER LIST */}
       {voters
         .filter((v: any) => v.name?.toLowerCase().includes(searchQuery.toLowerCase()))
         .map((v: any) => (
-          <View
+          <TouchableOpacity
             key={v.id}
+            onPress={() => {
+              setVoterToReset(v);
+              setIsResetModalVisible(true);
+            }}
             className="mb-2 flex-row items-center rounded-xl border border-gray-800 bg-[#1e1e1e] p-4">
             <View className="flex-1">
-              <Text className="font-bold text-white">{v.name}</Text>
-              <Text className="text-[10px] font-bold uppercase text-gray-500">{v.student_id}</Text>
+              <Text className="text-xl font-bold text-white" numberOfLines={1}>
+                {v.name}
+              </Text>
+              <Text className="text-base font-bold uppercase text-gray-500">{v.student_id}</Text>
             </View>
             <View
-              className={`mr-3 rounded px-2 py-1 ${v.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
+              className={`rounded px-3 py-1 ${v.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
               <Text
-                className={`text-[8px] font-bold ${v.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>
+                className={`text-sm font-bold ${v.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>
                 {v.has_voted ? 'VOTED' : 'PENDING'}
               </Text>
             </View>
-            <View className="flex-row gap-2">
-              <TouchableOpacity
-                onPress={() => confirmReset(v)}
-                className="rounded bg-[#f1c40f]/10 p-2">
-                <Text className="text-xs font-bold text-[#f1c40f]">RESET</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => confirmDelete(v)}
-                className="rounded bg-red-500/10 p-2">
-                <Text className="text-xs font-bold text-red-500">REMOVE</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
       {/* REMOVAL MODAL */}
@@ -440,8 +434,10 @@ export const VoterSection = ({
         }}>
         <View className="flex-1 items-center justify-center bg-black/80 p-6">
           <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
-            <Text className="mb-2 text-xl font-bold text-white">Remove {voterToRemove?.name}?</Text>
-            <Text className="mb-4 text-xs text-gray-500">
+            <Text className="mb-2 text-2xl font-bold text-white">
+              Remove {voterToRemove?.name}?
+            </Text>
+            <Text className="mb-4 text-base text-gray-500">
               Provide a reason for removal for the audit logs.
             </Text>
             <TextInput
@@ -450,18 +446,18 @@ export const VoterSection = ({
               value={removalReason}
               onChangeText={setRemovalReason}
               multiline
-              className="mb-6 h-24 rounded-xl border border-gray-800 bg-[#121212] p-4 text-white"
+              className="mb-6 h-24 rounded-xl border border-gray-800 bg-[#121212] p-4 text-lg text-white"
             />
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setIsRemoveModalVisible(false)}
                 className="flex-1 items-center rounded-xl bg-gray-800 p-4">
-                <Text className="text-white">Cancel</Text>
+                <Text className="text-lg text-white">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleFinalDelete}
                 className="flex-1 items-center rounded-xl bg-red-600 p-4">
-                <Text className="font-bold text-white">Confirm</Text>
+                <Text className="text-lg font-bold text-white">Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -481,19 +477,27 @@ export const VoterSection = ({
         }}>
         <View className="flex-1 items-center justify-center bg-black/80 p-6">
           <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
+            <Text className="mb-4 text-center text-3xl font-bold text-white">
+              {voterToReset?.name}
+            </Text>
+            <Text className="mb-1 text-center text-lg text-gray-400">
+              ID: {voterToReset?.student_id}
+            </Text>
+            <Text className="mb-1 text-center text-lg text-gray-400">
+              Email: {voterToReset?.email}
+            </Text>
+            <View
+              className={`mx-auto mb-6 mt-2 rounded-full px-4 py-1 ${voterToReset?.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
+              <Text
+                className={`text-base font-bold ${voterToReset?.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>
+                {voterToReset?.has_voted ? 'VOTED' : 'PENDING'}
+              </Text>
+            </View>
+
             {!isPasswordReset ? (
               <>
-                {/* Confirmation View - Before Reset */}
-                <Text className="mb-2 text-xl font-bold text-white">Reset Password</Text>
-                <Text className="mb-4 text-xs text-gray-500">
-                  You are about to reset the password for{' '}
-                  <Text className="font-bold text-white">{voterToReset?.name}</Text> (ID:{' '}
-                  {voterToReset?.student_id}). A new password will be generated and the old password
-                  will be invalidated.
-                </Text>
-
-                <Text className="mb-6 text-[10px] text-gray-500">
-                  The student will be required to change their password on next login.
+                <Text className="mb-4 text-base text-gray-500">
+                  Generate a new password. The old password will be invalidated.
                 </Text>
 
                 <View className="flex-row gap-3">
@@ -505,20 +509,29 @@ export const VoterSection = ({
                       setIsPasswordReset(false);
                     }}
                     className="flex-1 items-center rounded-xl bg-gray-800 p-4">
-                    <Text className="text-white">Cancel</Text>
+                    <Text className="text-lg text-white">Close</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={generateAndResetPassword}
                     className="flex-1 items-center rounded-xl bg-[#f1c40f] p-4">
-                    <Text className="font-bold text-black">Reset Password</Text>
+                    <Text className="text-lg font-bold text-black">Reset</Text>
                   </TouchableOpacity>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsResetModalVisible(false);
+                    setVoterToRemove(voterToReset);
+                    setIsRemoveModalVisible(true);
+                  }}
+                  className="mt-3 items-center rounded-xl border border-red-500 bg-red-500/10 p-4">
+                  <Text className="text-lg font-bold text-red-500">Remove Voter</Text>
+                </TouchableOpacity>
               </>
             ) : (
               <>
                 {/* Password Generated View - After Reset */}
-                <Text className="mb-2 text-xl font-bold text-white">Password Reset!</Text>
-                <Text className="mb-4 text-xs text-gray-500">
+                <Text className="mb-2 text-2xl font-bold text-white">Password Reset!</Text>
+                <Text className="mb-4 text-base text-gray-500">
                   Password for <Text className="font-bold text-white">{voterToReset?.name}</Text>{' '}
                   has been reset successfully.
                 </Text>
@@ -526,7 +539,7 @@ export const VoterSection = ({
                 {/* Generated Password Display */}
                 <View className="mb-4 rounded-xl border border-gray-800 bg-[#121212] p-4">
                   <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-[10px] font-bold uppercase text-gray-500">
+                    <Text className="text-base font-bold uppercase text-gray-500">
                       New Password
                     </Text>
                     <TouchableOpacity
@@ -537,15 +550,15 @@ export const VoterSection = ({
                           : Alert.alert('Copied', 'Password copied to clipboard!');
                       }}
                       className="rounded bg-[#f1c40f]/20 px-3 py-1">
-                      <Text className="text-[10px] font-bold text-[#f1c40f]">COPY</Text>
+                      <Text className="text-base font-bold text-[#f1c40f]">COPY</Text>
                     </TouchableOpacity>
                   </View>
-                  <Text className="text-center text-lg font-bold tracking-widest text-[#f1c40f]">
+                  <Text className="text-center text-2xl font-bold tracking-widest text-[#f1c40f]">
                     {newResetPassword}
                   </Text>
                 </View>
 
-                <Text className="mb-6 text-[10px] text-gray-500">
+                <Text className="mb-6 text-base text-gray-500">
                   Make sure to share this new password with the student.
                 </Text>
 
@@ -557,7 +570,7 @@ export const VoterSection = ({
                     setIsPasswordReset(false);
                   }}
                   className="items-center rounded-xl bg-gray-800 p-4">
-                  <Text className="text-white">Done</Text>
+                  <Text className="text-lg text-white">Close</Text>
                 </TouchableOpacity>
               </>
             )}

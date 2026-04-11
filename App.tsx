@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BackHandler, Alert } from 'react-native';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
 import AdminDashboard from './src/screens/AdminDashboard';
 import VoterScreen from './src/screens/VoterScreen';
@@ -40,18 +41,20 @@ function BackButtonHandler() {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <BackButtonHandler />
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-        <Stack.Screen name="VoterScreen" component={VoterScreen} />
-        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <BackButtonHandler />
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+          <Stack.Screen name="VoterScreen" component={VoterScreen} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

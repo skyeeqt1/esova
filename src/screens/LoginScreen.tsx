@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../config/supabase';
 
 const LoginScreen = ({ navigation }: any) => {
@@ -38,41 +50,45 @@ const LoginScreen = ({ navigation }: any) => {
       email: userEmail,
       password,
     });
-    
+
     // If auth succeeds, user is an admin
     if (!error && data.user) {
       return { isAdmin: true, user: data.user };
     }
-    
+
     // If auth failed with invalid credentials, user might be a voter
     if (error?.message?.includes('Invalid login credentials')) {
       return { isAdmin: false, user: null };
     }
-    
+
     // Other errors - return the error
     throw error;
   };
 
   const handleLogin = async () => {
     if (isLockedOut) {
-      Alert.alert("Account Temporarily Locked", `Too many failed attempts. Please wait ${timeLeft} before trying again.`);
+      Alert.alert(
+        'Account Temporarily Locked',
+        `Too many failed attempts. Please wait ${timeLeft} before trying again.`
+      );
       return;
     }
-    
-    if (!email || !password) return Alert.alert("Required", "Please enter your email or student ID and password.");
-    
+
+    if (!email || !password)
+      return Alert.alert('Required', 'Please enter your email or student ID and password.');
+
     setLoading(true);
     try {
       const userInput = email.toLowerCase().trim();
-      
+
       // Check if admin by trying Supabase Auth first (only if it looks like an email)
       const isEmail = userInput.includes('@');
       let adminCheck = null;
-      
+
       if (isEmail) {
         adminCheck = await checkAdminUser(userInput, password);
       }
-      
+
       if (isEmail && adminCheck?.isAdmin) {
         // Admin login successful
         setFailedAttempts(0);
@@ -86,14 +102,10 @@ const LoginScreen = ({ navigation }: any) => {
       // Try to find by email OR student_id
       let userData = null;
       let userError = null;
-      
+
       if (isEmail) {
         // If it looks like an email, search by email
-        const result = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', userInput)
-          .single();
+        const result = await supabase.from('users').select('*').eq('email', userInput).single();
         userData = result.data;
         userError = result.error;
       } else {
@@ -109,7 +121,7 @@ const LoginScreen = ({ navigation }: any) => {
 
       if (userError || !userData) {
         handleFailedAttempt();
-        Alert.alert("Access Denied", "Email or Student ID not registered.");
+        Alert.alert('Access Denied', 'Email or Student ID not registered.');
         setLoading(false);
         return;
       }
@@ -117,7 +129,7 @@ const LoginScreen = ({ navigation }: any) => {
       // Verify password against stored password
       if (userData.password !== password) {
         handleFailedAttempt();
-        Alert.alert("Access Denied", "Invalid password.");
+        Alert.alert('Access Denied', 'Invalid password.');
         setLoading(false);
         return;
       }
@@ -134,13 +146,12 @@ const LoginScreen = ({ navigation }: any) => {
 
       setFailedAttempts(0);
       setLockoutEndTime(null);
-      
+
       // Regular voter - go to VoterScreen with user data
       navigation.replace('VoterScreen', { voterData: userData });
-      
     } catch (error: any) {
       handleFailedAttempt();
-      Alert.alert("Error", "Login failed. Please check your internet connection.");
+      Alert.alert('Error', 'Login failed. Please check your internet connection.');
     } finally {
       setLoading(false);
     }
@@ -149,68 +160,69 @@ const LoginScreen = ({ navigation }: any) => {
   const handleFailedAttempt = () => {
     const newAttempts = failedAttempts + 1;
     setFailedAttempts(newAttempts);
-    
+
     if (newAttempts >= 5) {
       const lockoutTime = Date.now() + 30000;
       setLockoutEndTime(lockoutTime);
       Alert.alert(
-        "Too Many Failed Attempts", 
-        "You have exceeded the maximum number of login attempts. Please wait 30 seconds before trying again.",
-        [{ text: "OK" }]
+        'Too Many Failed Attempts',
+        'You have exceeded the maximum number of login attempts. Please wait 30 seconds before trying again.',
+        [{ text: 'OK' }]
       );
     } else {
       const remainingAttempts = 5 - newAttempts;
       Alert.alert(
-        "Login Failed", 
+        'Login Failed',
         `Invalid credentials. You have ${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining before being locked out.`,
-        [{ text: "OK" }]
+        [{ text: 'OK' }]
       );
     }
   };
 
   return (
-    <View className="flex-1 bg-[#1a1a1a]">
+    <SafeAreaView className="flex-1 bg-[#1a1a1a]" edges={['top']}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
+          style={{ flex: 1 }}>
           {/* Header Section */}
-          <View className="pt-16 pb-8 px-6 items-center">
-            <View className="bg-white rounded-full border-4 border-[#f1c40f] mb-4 shadow-lg shadow-yellow-500/20">
+          <View className="items-center px-6 pb-8 pt-16">
+            <View className="mb-4 rounded-full border-4 border-[#f1c40f] bg-white shadow-lg shadow-yellow-500/20">
               <Image
-                source={require("../assets/logo.png")}
-                className="w-36 h-36"
+                source={require('../assets/logo.png')}
+                className="h-36 w-36"
                 resizeMode="contain"
               />
             </View>
-            <Text className="text-[#f1c40f] text-3xl font-black italic tracking-tighter">
+            <Text className="text-5xl font-black italic tracking-tighter text-[#f1c40f]">
               E-SOVA
             </Text>
-            <Text className="text-gray-400 text-sm font-medium mt-1">
+            <Text className="mt-1 text-lg font-medium text-gray-400">
               ESCR Student Organization Voting Application
             </Text>
           </View>
 
           {/* Login Form Card */}
           <View className="flex-1 px-6">
-            <View className="bg-[#252525] rounded-3xl p-6 border border-gray-800 shadow-xl">
-              <Text className="text-white text-xl font-bold mb-1">Welcome Back</Text>
-              <Text className="text-gray-500 text-sm mb-6">Please sign in to continue</Text>
+            <View className="rounded-3xl border border-gray-800 bg-[#252525] p-6 shadow-xl">
+              <Text className="mb-1 text-2xl font-bold text-white">Welcome Back</Text>
+              <Text className="mb-6 text-base text-gray-500">Please sign in to continue</Text>
 
               {/* Email Field */}
               <View className="mb-4">
-                <Text className="text-gray-400 text-xs font-bold uppercase mb-2 ml-1">Email Address</Text>
-                <View className="bg-[#1a1a1a] rounded-xl border border-gray-700 flex-row items-center">
+                <Text className="mb-2 ml-1 text-base font-bold uppercase text-gray-400">
+                  Email Address
+                </Text>
+                <View className="flex-row items-center rounded-xl border border-gray-700 bg-[#1a1a1a]">
                   <View className="px-3">
-                    <Text className="text-gray-500">📧</Text>
+                    <Text className="text-xl text-gray-500">📧</Text>
                   </View>
-                  <TextInput 
+                  <TextInput
                     placeholder="Enter your email or Student ID"
                     placeholderTextColor="#555"
                     autoCapitalize="none"
                     keyboardType="email-address"
-                    className="flex-1 text-white p-4"
+                    className="flex-1 p-4 text-lg text-white"
                     value={email}
                     onChangeText={setEmail}
                   />
@@ -219,47 +231,49 @@ const LoginScreen = ({ navigation }: any) => {
 
               {/* Password Field */}
               <View className="mb-6">
-                <Text className="text-gray-400 text-xs font-bold uppercase mb-2 ml-1">Password</Text>
-                <View className="bg-[#1a1a1a] rounded-xl border border-gray-700 flex-row items-center">
+                <Text className="mb-2 ml-1 text-base font-bold uppercase text-gray-400">
+                  Password
+                </Text>
+                <View className="flex-row items-center rounded-xl border border-gray-700 bg-[#1a1a1a]">
                   <View className="px-3">
-                    <Text className="text-gray-500">🔒</Text>
+                    <Text className="text-xl text-gray-500">🔒</Text>
                   </View>
-                  <TextInput 
+                  <TextInput
                     placeholder="Enter your password"
                     placeholderTextColor="#555"
                     secureTextEntry={!showPassword}
-                    className="flex-1 text-white p-4"
+                    className="flex-1 p-4 text-lg text-white"
                     value={password}
                     onChangeText={setPassword}
                   />
-                  <TouchableOpacity 
-                    onPress={() => setShowPassword(!showPassword)}
-                    className="px-3"
-                  >
-                    <Text className="text-gray-500">{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="px-3">
+                    <Text className="text-xl text-gray-500">{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Login Button */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleLogin}
                 disabled={loading || isLockedOut}
-                className={`bg-[#f1c40f] p-4 rounded-xl border-b-4 border-yellow-700 active:bg-yellow-500 shadow-lg shadow-yellow-500/20 ${isLockedOut ? 'opacity-50' : ''}`}
-              >
+                className={`rounded-xl border-b-4 border-yellow-700 bg-[#f1c40f] p-4 shadow-lg shadow-yellow-500/20 active:bg-yellow-500 ${isLockedOut ? 'opacity-50' : ''}`}>
                 {loading ? (
                   <ActivityIndicator color="#000" />
                 ) : isLockedOut ? (
-                  <Text className="text-black text-center font-black text-lg uppercase italic">Locked ({timeLeft})</Text>
+                  <Text className="text-center text-xl font-black uppercase italic text-black">
+                    Locked ({timeLeft})
+                  </Text>
                 ) : (
-                  <Text className="text-black text-center font-black text-lg uppercase italic">Sign In</Text>
+                  <Text className="text-center text-xl font-black uppercase italic text-black">
+                    Sign In
+                  </Text>
                 )}
               </TouchableOpacity>
 
               {/* Attempts Warning */}
               {failedAttempts > 0 && !isLockedOut && (
-                <View className="items-center mt-4">
-                  <Text className="text-yellow-500 text-xs font-bold">
+                <View className="mt-4 items-center">
+                  <Text className="text-base font-bold text-yellow-500">
                     {5 - failedAttempts} attempt{5 - failedAttempts !== 1 ? 's' : ''} remaining
                   </Text>
                 </View>
@@ -267,8 +281,8 @@ const LoginScreen = ({ navigation }: any) => {
 
               {/* Lockout Message */}
               {isLockedOut && (
-                <View className="items-center mt-4 bg-red-500/20 p-3 rounded-xl">
-                  <Text className="text-red-500 text-xs font-bold text-center">
+                <View className="mt-4 items-center rounded-xl bg-red-500/20 p-3">
+                  <Text className="text-center text-base font-bold text-red-500">
                     Too many failed attempts.{'\n'}Please wait {timeLeft} to try again.
                   </Text>
                 </View>
@@ -276,20 +290,17 @@ const LoginScreen = ({ navigation }: any) => {
             </View>
 
             {/* Footer */}
-            <View className="items-center mt-8 mb-8">
-              <View className="bg-red-500/10 px-4 py-2 rounded-full border border-red-500/20">
-                <Text className="text-red-500 text-[10px] font-bold uppercase tracking-widest">
+            <View className="mb-8 mt-8 items-center">
+              <View className="rounded-full border border-red-500/20 bg-red-500/10 px-4 py-2">
+                <Text className="text-base font-bold uppercase tracking-widest text-red-500">
                   🔒 Authorized Personnel Only
                 </Text>
               </View>
-              <Text className="text-gray-600 text-xs mt-4">
-                Secure Student Voting System
-              </Text>
             </View>
           </View>
         </KeyboardAvoidingView>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 

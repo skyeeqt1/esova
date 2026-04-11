@@ -52,14 +52,14 @@ export const AdminLogsSection = ({ logs }: { logs: any[] }) => {
   // Get action description for better UX
   const getActionDescription = (action: string) => {
     const descriptions: { [key: string]: string } = {
-      'ADD_VOTER': 'Added Voter',
-      'ADD_CANDIDATE': 'Added Candidate',
-      'DELETE_VOTER': 'Removed Voter',
-      'DELETE_CANDIDATE': 'Removed Candidate',
-      'UPDATE_CANDIDATE': 'Updated Candidate',
-      'IMPORT_VOTERS': 'Bulk Import',
-      'RESET_ELECTION': 'Reset Election',
-      'VOTE_CAST': 'Vote Cast',
+      ADD_VOTER: 'Added Voter',
+      ADD_CANDIDATE: 'Added Candidate',
+      DELETE_VOTER: 'Removed Voter',
+      DELETE_CANDIDATE: 'Removed Candidate',
+      UPDATE_CANDIDATE: 'Updated Candidate',
+      IMPORT_VOTERS: 'Bulk Import',
+      RESET_ELECTION: 'Reset Election',
+      VOTE_CAST: 'Vote Cast',
     };
     return descriptions[action] || action;
   };
@@ -67,57 +67,54 @@ export const AdminLogsSection = ({ logs }: { logs: any[] }) => {
   return (
     <ScrollView className="flex-1">
       {logs.length === 0 ? (
-        <View className="bg-[#1e1e1e] p-6 rounded-xl items-center">
-          <Text className="text-gray-500">No logs yet</Text>
+        <View className="items-center rounded-xl bg-[#1e1e1e] p-6">
+          <Text className="text-lg text-gray-500">No logs yet</Text>
         </View>
       ) : (
         logs.map((log) => {
           const actionColor = getActionColor(log.action);
           return (
-            <View 
-              key={log.id} 
-              className="bg-[#1e1e1e] p-4 rounded-xl mb-2 border-l-4"
-              style={{ borderLeftColor: actionColor }}
-            >
-              <View className="flex-row justify-between items-center">
-                <Text className="text-white font-bold text-xs" style={{ color: actionColor }}>
+            <View
+              key={log.id}
+              className="mb-2 rounded-xl border-l-4 bg-[#1e1e1e] p-4"
+              style={{ borderLeftColor: actionColor }}>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-base font-bold text-white" style={{ color: actionColor }}>
                   {getActionDescription(log.action)}
                 </Text>
-                <Text className="text-gray-500 text-[9px]">
-                  {formatTimestamp(log.timestamp)}
-                </Text>
+                <Text className="text-sm text-gray-500">{formatTimestamp(log.timestamp)}</Text>
               </View>
-              <Text className="text-gray-400 text-[11px] mt-1">
-                Target: <Text className="text-white font-medium">{log.target_name}</Text>
+              <Text className="mt-1 text-base text-gray-400">
+                Target: <Text className="font-medium text-white">{log.target_name}</Text>
               </Text>
               {log.target_id && (
-                <Text className="text-gray-500 text-[10px]">
+                <Text className="text-base text-gray-500">
                   ID: <Text className="text-gray-400">{log.target_id}</Text>
                 </Text>
               )}
-              {log.reason && (
-                hasPassword(log.reason) ? (
-                  <View className="flex-row items-center mt-1">
-                    <Text className="text-gray-500 text-[10px] italic">
+              {log.reason &&
+                (hasPassword(log.reason) ? (
+                  <View className="mt-1 flex-row items-center">
+                    <Text className="flex-1 pr-2 text-base italic text-gray-500">
                       {revealedPasswords.has(log.id) ? log.reason : maskPassword(log.reason)}
                     </Text>
                     <TouchableOpacity
                       onPress={() => togglePasswordReveal(log.id)}
-                      className="ml-1 p-1"
-                    >
+                      className="flex-shrink-0">
                       <Ionicons
                         name={revealedPasswords.has(log.id) ? 'eye-off' : 'eye'}
-                        size={14}
+                        size={18}
                         color="#3498db"
                       />
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <Text className="text-gray-500 text-[10px] italic mt-1">"{log.reason}"</Text>
-                )
-              )}
+                  <Text className="mt-1 text-base italic text-gray-500">"{log.reason}"</Text>
+                ))}
               {log.admin_email && (
-                <Text className="text-[#f1c40f] text-[10px] font-medium mt-1">By: {log.admin_email}</Text>
+                <Text className="mt-1 text-base font-medium text-[#f1c40f]">
+                  By: {log.admin_email}
+                </Text>
               )}
             </View>
           );

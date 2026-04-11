@@ -7,9 +7,10 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
-import { POSITIONS } from '../../hooks/useAdminData';
+import { POSITIONS, DEFAULT_AVATAR } from '../../hooks/useAdminData';
 import { supabase } from '../../config/supabase';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -213,10 +214,10 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
       {/* TIMER & CONTROLS */}
       <View className="mb-6 rounded-2xl border border-gray-800 bg-[#1e1e1e] p-5">
         <View className="mb-4 flex-row items-center justify-between">
-          <Text className="text-xs font-bold uppercase text-[#00b894]">Duration & Controls</Text>
+          <Text className="text-base font-bold uppercase text-[#00b894]">Duration & Controls</Text>
           <View className="rounded-lg border border-gray-800 bg-black px-3 py-1">
             <Text
-              className={`font-mono font-bold ${isVotingOver ? 'text-red-500' : 'text-[#00b894]'}`}>
+              className={`font-mono text-xl font-bold ${isVotingOver ? 'text-red-500' : 'text-[#00b894]'}`}>
               {timeLeft}
             </Text>
           </View>
@@ -228,7 +229,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
               onPress={() => setTimeUnit('min')}
               className={`rounded-lg px-3 py-2 ${timeUnit === 'min' ? 'bg-[#00b894]' : ''}`}>
               <Text
-                className={`text-[10px] font-bold ${timeUnit === 'min' ? 'text-black' : 'text-gray-500'}`}>
+                className={`text-base font-bold ${timeUnit === 'min' ? 'text-black' : 'text-gray-500'}`}>
                 MIN
               </Text>
             </TouchableOpacity>
@@ -236,13 +237,13 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
               onPress={() => setTimeUnit('sec')}
               className={`rounded-lg px-3 py-2 ${timeUnit === 'sec' ? 'bg-[#00b894]' : ''}`}>
               <Text
-                className={`text-[10px] font-bold ${timeUnit === 'sec' ? 'text-black' : 'text-gray-500'}`}>
+                className={`text-base font-bold ${timeUnit === 'sec' ? 'text-black' : 'text-gray-500'}`}>
                 SEC
               </Text>
             </TouchableOpacity>
           </View>
           <TextInput
-            className="mr-2 flex-1 rounded-xl border border-gray-700 bg-black p-3 text-white"
+            className="mr-2 flex-1 rounded-xl border border-gray-700 bg-black p-4 text-lg text-white"
             keyboardType="numeric"
             value={duration}
             onChangeText={setDuration}
@@ -250,7 +251,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
           <TouchableOpacity
             onPress={handleStartVoting}
             className="rounded-xl bg-[#00b894] px-6 py-3">
-            <Text className="text-xs font-bold uppercase text-black">Start</Text>
+            <Text className="text-base font-bold uppercase text-black">Start</Text>
           </TouchableOpacity>
         </View>
 
@@ -259,7 +260,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
             onPress={handleToggleResults}
             className={`${settings?.results_published ? 'border border-red-500 bg-red-500/20' : 'bg-blue-600'} items-center rounded-xl p-4`}>
             <Text
-              className={`${settings?.results_published ? 'text-red-500' : 'text-white'} text-xs font-bold uppercase`}>
+              className={`${settings?.results_published ? 'text-red-500' : 'text-white'} text-base font-bold uppercase`}>
               {settings?.results_published ? 'HIDE RESULTS FROM VOTERS' : 'FLASH RESULTS TO VOTERS'}
             </Text>
           </TouchableOpacity>
@@ -271,7 +272,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
         <View
           className={`mb-2 rounded-full px-4 py-1 ${isVotingOver ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
           <Text
-            className={`text-[8px] font-bold uppercase ${isVotingOver ? 'text-red-500' : 'text-green-500'}`}>
+            className={`text-sm font-bold uppercase ${isVotingOver ? 'text-red-500' : 'text-green-500'}`}>
             {settings?.status === 'started'
               ? isVotingOver
                 ? 'Session Ended'
@@ -279,57 +280,78 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
               : 'Ready'}
           </Text>
         </View>
-        <Text className="text-xs font-bold uppercase text-gray-400">Total Voters</Text>
-        <Text className="my-2 text-5xl font-bold text-white">{voters.length}</Text>
+        <Text className="text-base font-bold uppercase text-gray-400">Registered Voters</Text>
+        <Text className="my-2 text-6xl font-bold text-white">{voters.length}</Text>
+        {(settings?.status === 'started' || settings?.status === 'idle') && (
+          <View className="mt-2 rounded-full bg-[#f1c40f]/20 px-4 py-2">
+            <Text className="text-lg font-bold text-[#f1c40f]">
+              {voters.filter((v: any) => v.has_voted).length} / {voters.length} voted
+            </Text>
+          </View>
+        )}
 
         <View className="mt-4 flex-row gap-4">
           <TouchableOpacity
             onPress={onResetPress}
             className="rounded-full border border-red-500/50 bg-red-500/10 px-6 py-2">
-            <Text className="text-[10px] font-bold uppercase text-red-500">Reset</Text>
+            <Text className="text-base font-bold uppercase text-red-500">Reset</Text>
           </TouchableOpacity>
           {isVotingOver && settings?.status === 'started' && (
             <TouchableOpacity
               onPress={handlePrint}
               className="rounded-full border border-white/50 bg-white/10 px-6 py-2">
-              <Text className="text-[10px] font-bold uppercase text-white">Print Results</Text>
+              <Text className="text-base font-bold uppercase text-white">Print Results</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* DYNAMIC CHARTS WITH WINNER BADGE */}
+      {/* CANDIDATES TABLE */}
       {POSITIONS.map((pos) => {
         const posCand = candidates.filter((c: any) => c.position === pos);
         if (posCand.length === 0) return null;
 
+        const sortedCand = [...posCand].sort((a, b) => (b.votes || 0) - (a.votes || 0));
         const maxVotes = Math.max(...posCand.map((c: any) => c.votes || 0));
 
         return (
           <View key={pos} className="mb-6 rounded-2xl border border-gray-800 bg-[#1e1e1e] p-4">
-            <Text className="mb-4 text-center text-xs font-bold uppercase tracking-widest text-[#00b894]">
+            <Text className="mb-4 text-center text-lg font-bold uppercase tracking-widest text-[#00b894]">
               {pos}
             </Text>
-            <BarChart
-              data={{
-                labels: posCand.map((c: any) => {
-                  const name = c.name.split(' ')[0];
-                  return isVotingOver && c.votes === maxVotes && maxVotes > 0 ? `👑 ${name}` : name;
-                }),
-                datasets: [{ data: posCand.map((c: any) => c.votes || 0) }],
-              }}
-              width={Dimensions.get('window').width - 80}
-              height={180}
-              fromZero
-              chartConfig={{
-                backgroundGradientFrom: '#1e1e1e',
-                backgroundGradientTo: '#1e1e1e',
-                color: (opacity = 1) => `rgba(0, 184, 148, ${opacity})`,
-                labelColor: () => '#aaa',
-                decimalPlaces: 0,
-              }}
-              style={{ borderRadius: 16 }}
-            />
+            {sortedCand.map((c: any, index: number) => {
+              const isWinner = isVotingOver && c.votes === maxVotes && maxVotes > 0;
+              const isFirst = index === 0;
+              const tiedCandidates = posCand.filter((x: any) => x.votes === maxVotes);
+              const hasTie = isVotingOver && tiedCandidates.length > 1 && maxVotes > 0;
+              const isTied = c.votes === maxVotes && hasTie;
+              const rankDisplay = isTied ? (tiedCandidates.length + 1) / 2 : index + 1;
+              const rankColor = isFirst ? 'text-[#f1c40f]' : 'text-gray-400';
+              return (
+                <View
+                  key={c.id}
+                  className={`mb-3 flex-row items-center rounded-xl p-2 ${isTied ? 'border border-purple-500 bg-purple-500/20' : isFirst ? 'border border-[#00b894] bg-[#00b894]/20' : 'border border-transparent bg-black/30'}`}>
+                  <Text className={`w-10 text-xl font-bold ${rankColor}`}>#{rankDisplay}</Text>
+                  <Image
+                    source={{ uri: c.image || DEFAULT_AVATAR }}
+                    className="mr-3 h-14 w-14 rounded-full"
+                  />
+                  <View className="flex-1">
+                    <Text
+                      className={`text-xl font-bold text-white ${isTied ? 'text-purple-400' : isWinner ? 'text-[#00b894]' : ''}`}>
+                      {c.name}
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text
+                      className={`text-2xl font-bold ${isTied ? 'text-purple-400' : isWinner ? 'text-[#00b894]' : 'text-white'}`}>
+                      {c.votes || 0}
+                    </Text>
+                    {isTied && <Text className="text-base font-bold text-purple-400">TIE</Text>}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         );
       })}
