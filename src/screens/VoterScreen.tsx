@@ -25,7 +25,6 @@ const VoterScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
   const [viewingCandidate, setViewingCandidate] = useState<any>(null);
-  const [showReceiptOverride, setShowReceiptOverride] = useState(false);
   const [electionSettings, setElectionSettings] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(true);

@@ -385,8 +385,6 @@ export const VoterSection = ({
         </TouchableOpacity>
       </View>
 
-      {/* CSV IMPORT */}
-
       {/* SEARCH BAR */}
       <TextInput
         placeholder="Search students..."

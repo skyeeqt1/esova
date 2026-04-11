@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Dimensions,
-  TextInput,
-  Alert,
-  ScrollView,
-  Image,
-} from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
+import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image } from 'react-native';
 import { POSITIONS, DEFAULT_AVATAR } from '../../hooks/useAdminData';
 import { supabase } from '../../config/supabase';
 import * as Print from 'expo-print';
