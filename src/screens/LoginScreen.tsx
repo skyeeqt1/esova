@@ -194,7 +194,7 @@ const LoginScreen = ({ navigation }: any) => {
                 resizeMode="contain"
               />
             </View>
-            <Text className="text-5xl font-black italic tracking-tighter text-[#f1c40f]">
+<Text className="text-3xl sm:text-5xl font-black italic tracking-tighter text-[#f1c40f]">
               E-SOVA
             </Text>
             <Text className="mt-1 text-lg font-medium text-gray-400">
@@ -205,8 +205,10 @@ const LoginScreen = ({ navigation }: any) => {
           {/* Login Form Card */}
           <View className="flex-1 px-6">
             <View className="rounded-3xl border border-gray-800 bg-[#252525] p-6 shadow-xl">
-              <Text className="mb-1 text-2xl font-bold text-white">Welcome Back</Text>
-              <Text className="mb-6 text-base text-gray-500">Please sign in to continue</Text>
+            <Text className="text-xl sm:text-2xl font-bold text-white">
+              Welcome Back
+            </Text>
+            <Text className="mb-6 text-base text-gray-500">Please sign in to continue</Text>
 
               {/* Email Field */}
               <View className="mb-4">
@@ -222,7 +224,7 @@ const LoginScreen = ({ navigation }: any) => {
                     placeholderTextColor="#555"
                     autoCapitalize="none"
                     keyboardType="email-address"
-                    className="flex-1 p-4 text-lg text-white"
+                    className="flex-1 p-4 text-base sm:text-lg text-white"
                     value={email}
                     onChangeText={setEmail}
                   />
@@ -242,7 +244,7 @@ const LoginScreen = ({ navigation }: any) => {
                     placeholder="Enter your password"
                     placeholderTextColor="#555"
                     secureTextEntry={!showPassword}
-                    className="flex-1 p-4 text-lg text-white"
+                    className="flex-1 p-4 text-base sm:text-lg text-white"
                     value={password}
                     onChangeText={setPassword}
                   />

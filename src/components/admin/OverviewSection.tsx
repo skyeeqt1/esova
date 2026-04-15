@@ -271,7 +271,7 @@ export const OverviewSection = ({ voters, candidates, handleResetElection }: any
           </Text>
         </View>
         <Text className="text-base font-bold uppercase text-gray-400">Registered Voters</Text>
-        <Text className="my-2 text-6xl font-bold text-white">{voters.length}</Text>
+        <Text className="my-2 text-4xl sm:text-6xl font-bold text-white">{voters.length}</Text>
         {(settings?.status === 'started' || settings?.status === 'idle') && (
           <View className="mt-2 rounded-full bg-[#f1c40f]/20 px-4 py-2">
             <Text className="text-lg font-bold text-[#f1c40f]">

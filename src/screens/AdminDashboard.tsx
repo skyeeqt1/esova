@@ -25,7 +25,7 @@ const AdminDashboard = ({ navigation, route }: any) => {
           />
         </View>
         <View>
-          <Text className="text-2xl font-bold text-[#00b894]">ESCR ADMIN</Text>
+          <Text className="text-xl sm:text-2xl font-bold text-[#00b894]">ESCR ADMIN</Text>
           <Text className="text-base text-gray-500">Election Control Panel</Text>
         </View>
         <TouchableOpacity

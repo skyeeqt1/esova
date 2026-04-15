@@ -283,19 +283,19 @@ const VoterScreen = ({ navigation, route }: any) => {
                   resizeMode="contain"
                 />
               </View>
-              <Text className="text-4xl font-black italic text-[#f1c40f]">WELCOME, VOTER!</Text>
+              <Text className="text-2xl sm:text-4xl font-black italic text-[#f1c40f]">WELCOME, VOTER!</Text>
               <Text className="mt-2 text-lg font-bold text-white">Hello, {userData?.name}!</Text>
               <Text className="text-base text-gray-500">ID: {userData?.student_id}</Text>
             </View>
 
             <View className="mb-4 border-b border-t border-gray-800 py-4">
-              <Text className="mb-3 text-2xl font-black italic text-[#f1c40f]">
+              <Text className="mb-3 text-xl sm:text-2xl font-black italic text-[#f1c40f]">
                 VOTING INSTRUCTIONS
               </Text>
               <View className="space-y-2">
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">1.</Text>
-                  <Text className="text-lg text-gray-300">
+              <Text className="text-base sm:text-lg text-gray-300">
                     Review all candidates for each position carefully.
                   </Text>
                 </View>
@@ -347,9 +347,9 @@ const VoterScreen = ({ navigation, route }: any) => {
             </View>
 
             <TouchableOpacity
-              onPress={() => setShowTermsModal(false)}
+onPress={() => setShowTermsModal(false)}
               className="rounded-xl border-b-4 border-yellow-700 bg-[#f1c40f] p-4">
-              <Text className="text-center text-xl font-black uppercase italic text-black">
+              <Text className="text-center text-lg sm:text-xl font-black uppercase italic text-black">
                 I Accept - Proceed to Vote
               </Text>
             </TouchableOpacity>
