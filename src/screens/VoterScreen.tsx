@@ -10,14 +10,12 @@ import {
   Modal,
   BackHandler,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../config/supabase';
 
 const POSITIONS = ['President', 'VP', 'Secretary', 'Treasurer'];
 const DEFAULT_AVATAR = 'https://via.placeholder.com/150';
 
 const VoterScreen = ({ navigation, route }: any) => {
-  const insets = useSafeAreaInsets();
   const [candidates, setCandidates] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('President');
   const [selectedVotes, setSelectedVotes] = useState<any>({});
@@ -25,6 +23,7 @@ const VoterScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
   const [viewingCandidate, setViewingCandidate] = useState<any>(null);
+  const [showReceiptOverride, setShowReceiptOverride] = useState(false);
   const [electionSettings, setElectionSettings] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(true);
@@ -272,7 +271,7 @@ const VoterScreen = ({ navigation, route }: any) => {
   // TERMS AND CONDITIONS / INSTRUCTIONS SCREEN (Shown before voting)
   if (showTermsModal && !isEnded && !userData?.has_voted) {
     return (
-      <View className="flex-1 bg-[#1a1a1a] pb-12">
+      <View className="flex-1 bg-[#1a1a1a]">
         <View className="flex-1 items-center  justify-center bg-black/80">
           <View className="w-full max-w-md rounded-3xl border border-[#f1c40f] bg-[#1e1e1e] p-6">
             <View className="mb-4 items-center">
@@ -283,43 +282,43 @@ const VoterScreen = ({ navigation, route }: any) => {
                   resizeMode="contain"
                 />
               </View>
-              <Text className="text-2xl sm:text-4xl font-black italic text-[#f1c40f]">WELCOME, VOTER!</Text>
-              <Text className="mt-2 text-lg font-bold text-white">Hello, {userData?.name}!</Text>
-              <Text className="text-base text-gray-500">ID: {userData?.student_id}</Text>
+              <Text className="text-3xl font-black italic text-[#f1c40f]">WELCOME, VOTER!</Text>
+              <Text className="mt-2 text-base font-bold text-white">Hello, {userData?.name}!</Text>
+              <Text className="text-sm text-gray-500">ID: {userData?.student_id}</Text>
             </View>
 
             <View className="mb-4 border-b border-t border-gray-800 py-4">
-              <Text className="mb-3 text-xl sm:text-2xl font-black italic text-[#f1c40f]">
+              <Text className="mb-3 text-xl font-black italic text-[#f1c40f]">
                 VOTING INSTRUCTIONS
               </Text>
               <View className="space-y-2">
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">1.</Text>
-              <Text className="text-base sm:text-lg text-gray-300">
+                  <Text className="text-base text-gray-300">
                     Review all candidates for each position carefully.
                   </Text>
                 </View>
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">2.</Text>
-                  <Text className="text-lg text-gray-300">
+                  <Text className="text-base text-gray-300">
                     Tap on a candidate to select your vote for each position.
                   </Text>
                 </View>
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">3.</Text>
-                  <Text className="text-lg text-gray-300">
+                  <Text className="text-base text-gray-300">
                     You must select a candidate for ALL positions to proceed.
                   </Text>
                 </View>
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">4.</Text>
-                  <Text className="text-lg text-gray-300">
+                  <Text className="text-base text-gray-300">
                     Review your ballot before submitting.
                   </Text>
                 </View>
                 <View className="flex-row items-start">
                   <Text className="mr-2 font-bold text-[#f1c40f]">5.</Text>
-                  <Text className="text-lg text-gray-300">
+                  <Text className="text-base text-gray-300">
                     Once submitted, your vote cannot be changed.
                   </Text>
                 </View>
@@ -327,11 +326,11 @@ const VoterScreen = ({ navigation, route }: any) => {
             </View>
 
             <View className="mb-6 rounded-xl bg-black/50 p-4">
-              <Text className="mb-2 text-lg font-black italic text-[#f1c40f]">
+              <Text className="mb-2 text-base font-black italic text-[#f1c40f]">
                 TERMS AND CONDITIONS
               </Text>
               <ScrollView style={{ maxHeight: 150 }}>
-                <Text className="text-base leading-5 text-gray-400">
+                <Text className="text-sm leading-5 text-gray-400">
                   • By proceeding with this vote, you acknowledge that your selection is final and
                   cannot be modified after submission.{'\n'}• You certify that you are an eligible
                   voter and have the right to participate in this election.{'\n'}• All votes are
@@ -347,9 +346,9 @@ const VoterScreen = ({ navigation, route }: any) => {
             </View>
 
             <TouchableOpacity
-onPress={() => setShowTermsModal(false)}
+              onPress={() => setShowTermsModal(false)}
               className="rounded-xl border-b-4 border-yellow-700 bg-[#f1c40f] p-4">
-              <Text className="text-center text-lg sm:text-xl font-black uppercase italic text-black">
+              <Text className="text-center text-xl font-black uppercase italic text-black">
                 I Accept - Proceed to Vote
               </Text>
             </TouchableOpacity>
@@ -357,13 +356,341 @@ onPress={() => setShowTermsModal(false)}
             <TouchableOpacity
               onPress={handleLogout}
               className="mt-4 rounded-xl border border-gray-800 p-4">
-              <Text className="text-center text-base font-bold text-red-500">Decline & Logout</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
     );
   }
+
+  if (!isStarted)
+    return (
+      <View className="flex-1 items-center justify-center bg-black p-10">
+        <View className="mb-10 items-center">
+          <View className="mb-4 rounded-full border-2 border-[#f1c40f] bg-white">
+            <Image
+              source={require('../assets/logo.png')}
+              className="h-40 w-40"
+              resizeMode="contain"
+            />
+          </View>
+          <Text className="mt-1 pb-2 text-[36px] font-bold uppercase tracking-[3px] text-gray-400">
+            ESOVA
+          </Text>
+          <Text className="text-5xl font-black italic tracking-tighter text-[#f1c40f]">
+            VOTING<Text className="text-white">PORTAL</Text>
+          </Text>
+        </View>
+        <Text className="text-2xl font-black italic text-[#f1c40f]">NO VOTING SESSION YET</Text>
+        <TouchableOpacity
+          onPress={handleLogout}
+          className="mt-8 rounded-full border border-gray-800 px-8 py-3">
+          <Text className="font-bold text-red-500">LOGOUT</Text>
+        </TouchableOpacity>
+      </View>
+    );
+
+  return (
+    <View className="flex-1 bg-[#1a1a1a]">
+      <View className="flex-1">
+        {/* HEADER BAR */}
+        <View className="flex-row items-center justify-between border-b-2 border-[#f1c40f] bg-black px-6 pb-4 pt-12">
+          <View>
+            <Text className="text-2xl font-black italic tracking-tighter text-[#f1c40f]">
+              E-SOVA
+            </Text>
+            <Text className="text-xs uppercase tracking-[1px] text-white opacity-60">
+              {isEnded ? 'SESSION' : `TIME LEFT`}
+            </Text>
+            <Text className="font-bold text-[#e74c3c]"> {timeLeft}</Text>
+          </View>
+          <View className="items-center justify-center rounded-full border-2 border-[#f1c40f] bg-white">
+            <Image
+              source={require('../assets/logo.png')}
+              className="h-20 w-20"
+              resizeMode="contain"
+            />
+          </View>
+          <TouchableOpacity
+            onPress={handleLogout}
+            className="rounded-full border border-gray-800 bg-[#1a1a1a] px-4 py-2">
+            <Text className="text-xs font-black tracking-widest text-red-500">LOGOUT</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView className="flex-1 px-4 pt-4">
+          {/* LOGIC: IF ELECTION ENDED AND USER IS NOT VIEWING RECEIPT */}
+          {isEnded && !showReceiptOverride ? (
+            <View>
+              {electionSettings?.results_published ? (
+                /* OFFICIAL RESULTS PANEL - SHOWS ALL CANDIDATES WITH VOTES */
+                <View className="rounded-3xl border border-[#f1c40f] bg-[#1e1e1e] p-6">
+                  <Text className="mb-6 text-center text-3xl font-black italic text-[#f1c40f]">
+                    OFFICIAL RESULTS
+                  </Text>
+                  {POSITIONS.map((pos) => {
+                    const sorted = candidates
+                      .filter((c) => c.position === pos)
+                      .sort((a, b) => b.votes - a.votes);
+                    return (
+                      <View key={pos} className="mb-6">
+                        <Text className="mb-3 text-center text-sm font-bold uppercase tracking-widest text-[#00b894]">
+                          {pos}
+                        </Text>
+                        {sorted.map((cand, index) => {
+                          const isWinner = index === 0;
+                          return (
+                            <View
+                              key={cand.id}
+                              className={`mb-2 flex-row items-center justify-between rounded-xl p-3 ${isWinner ? 'border border-[#00b894] bg-[#00b894]/20' : 'border border-gray-800 bg-black/50'}`}>
+                              <View className="flex-1 flex-row items-center">
+                                <Text
+                                  className={`mr-2 text-xl font-bold ${isWinner ? 'text-[#00b894]' : 'text-gray-400'}`}>
+                                  {index + 1}.
+                                </Text>
+                                <View>
+                                  <Text
+                                    className={`font-bold ${isWinner ? 'text-[#00b894]' : 'text-white'}`}>
+                                    {cand.name}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View className="items-end">
+                                <Text
+                                  className={`text-xl font-black ${isWinner ? 'text-[#ffff00]' : 'text-gray-400'}`}>
+                                  {cand.votes || 0}
+                                </Text>
+                                {isWinner && (
+                                  <Text className="text-xs font-bold text-[#00b894]">
+                                    WINNER
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
+                  <TouchableOpacity
+                    onPress={() => setShowReceiptOverride(true)}
+                    className="mt-4 items-center rounded-xl bg-gray-800 p-4">
+                    <Text className="text-xs font-bold uppercase text-[#f1c40f]">
+                      View My Ballot Receipt
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* POLLS CLOSED STATE (Hides candidate list even if user hasn't voted) */
+                <View className="items-center rounded-3xl border border-gray-800 bg-[#1e1e1e] p-10">
+                  <Text className="text-lg font-black text-white">The election has ended</Text>
+                  <Text className="mt-2 text-center text-xs text-gray-500">
+                    Please wait for the administrator to flash the official results.
+                  </Text>
+                  {userData?.has_voted && (
+                    <TouchableOpacity
+                      onPress={() => setShowReceiptOverride(true)}
+                      className="mt-8 rounded-full border border-gray-700 px-8 py-3">
+                      <Text className="text-xs font-bold text-[#f1c40f]">
+                        VIEW BALLOT RECEIPT
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          ) : (
+            /* ACTIVE VOTING (Only visible while isEnded is FALSE) */
+            <>
+              {step === 1 && !isEnded && (
+                <View>
+                  <View className="mb-4 rounded-xl border-l-4 border-[#f1c40f] bg-[#1e1e1e] p-4">
+                    <Text className="text-xl font-bold text-white">Hello, {userData?.name}!</Text>
+                    <Text className="text-sm font-bold uppercase text-gray-400">
+                      ID: {userData?.student_id}
+                    </Text>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className="mb-6 flex-row rounded-full border border-gray-800 bg-black p-1">
+                    {POSITIONS.map((pos) => (
+                      <TouchableOpacity
+                        key={pos}
+                        onPress={() => setActiveTab(pos)}
+                        className={`rounded-full px-6 py-2 ${activeTab === pos ? 'bg-[#f1c40f]' : ''}`}>
+                        <Text
+                          className={`text-xs font-black ${activeTab === pos ? 'text-black' : 'text-gray-500'}`}>
+                          {pos}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {candidates
+                    .filter((c) => c.position === activeTab)
+                    .map((candidate) => (
+                      <TouchableOpacity
+                        key={candidate.id}
+                        onPress={() =>
+                          setSelectedVotes({ ...selectedVotes, [activeTab]: candidate })
+                        }
+                        className={`mb-3 flex-row items-center rounded-2xl border-2 p-4 ${selectedVotes[activeTab]?.id === candidate.id ? 'border-[#f1c40f] bg-[#2a2a2a]' : 'border-gray-800 bg-[#1e1e1e]'}`}>
+                        <Image
+                          source={{ uri: candidate.image || DEFAULT_AVATAR }}
+                          className="mr-4 h-16 w-16 rounded-xl border border-gray-700 bg-black"
+                        />
+                        <View className="flex-1">
+                          <Text
+                            className={`text-xl font-black ${selectedVotes[activeTab]?.id === candidate.id ? 'text-[#f1c40f]' : 'text-white'}`}>
+                            {candidate.name}
+                          </Text>
+                          <Text className="text-xs uppercase text-gray-400">
+                            {candidate.course} • Year {candidate.year}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setViewingCandidate(candidate)}
+                            className="mt-1">
+                            <Text className="text-xs font-bold text-[#f1c40f] underline">
+                              VIEW PROFILE
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        {selectedVotes[activeTab]?.id === candidate.id && (
+                          <View className="rounded-full bg-[#f1c40f] px-2 py-1">
+                            <Text className="text-xs font-bold text-black">SELECTED</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  {POSITIONS.every((p) => selectedVotes[p]) && (
+                    <TouchableOpacity
+                      onPress={() => setStep(2)}
+                      className="mb-10 mt-6 rounded-xl bg-[#f1c40f] p-4">
+                      <Text className="text-center font-black text-black">REVIEW BALLOT</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {step === 2 && !isEnded && (
+                <View className="rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
+                  <Text className="mb-6 text-3xl font-black italic text-[#f1c40f]">
+                    REVIEW BALLOT
+                  </Text>
+                  {POSITIONS.map((pos) => (
+                    <View
+                      key={pos}
+                      className="mb-3 flex-row items-center justify-between rounded-xl border border-gray-900 bg-black p-4">
+                      <View>
+                        <Text className="text-xs uppercase text-gray-500">{pos}</Text>
+                        <Text className="text-lg font-bold text-white">{selectedVotes[pos]?.name}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setStep(1);
+                          setActiveTab(pos);
+                        }}>
+                        <Text className="text-sm text-[#f1c40f]">EDIT</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    onPress={handleVoteSubmit}
+                    className="mt-8 rounded-2xl bg-[#e74c3c] p-5">
+                    <Text className="text-center text-2xl font-black uppercase italic text-white">
+                      Cast Vote Now
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* PERSISTENT RECEIPT VIEW (Accessible via Step 3 or Override) */}
+              {(step === 3 || showReceiptOverride) && (
+                <View>
+                  <View className="mb-4 mt-4 rounded-lg border-t-8 border-[#f1c40f] bg-white p-6">
+                    <Text className="text-center text-3xl font-black italic text-black">
+                      OFFICIAL RECEIPT
+                    </Text>
+                    <View className="my-4 h-[1px] w-full border border-dashed bg-gray-200" />
+                    <View className="mb-4">
+                      <Text className="text-xs font-bold uppercase text-gray-500">
+                        Voter: {userData?.name}
+                      </Text>
+                      <Text className="text-xs font-bold uppercase text-gray-500">
+                        ID: {userData?.student_id}
+                      </Text>
+                      <Text className="text-xs font-bold uppercase text-gray-500">
+                        Time Cast: {userData?.voted_at}
+                      </Text>
+                    </View>
+                    <View className="rounded-lg bg-gray-100 p-4">
+                      {POSITIONS.map((pos) => (
+                        <View
+                          key={pos}
+                          className="flex-row justify-between border-b border-gray-200 py-2">
+                          <Text className="text-xs font-bold text-gray-500">{pos}:</Text>
+                          <Text className="text-sm font-black text-black">
+                            {selectedVotes[pos]?.name?.toUpperCase()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                  {isEnded && (
+                    <TouchableOpacity
+                      onPress={() => setShowReceiptOverride(false)}
+                      className="mb-20 items-center rounded-xl border border-gray-700 bg-black/50 p-4">
+                      <Text className="text-xs font-bold uppercase text-white">
+                        Back to Election Result
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </View>
+
+      {/* Profile Modal */}
+      <Modal
+        visible={!!viewingCandidate}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setViewingCandidate(null)}>
+        <View className="flex-1 items-center justify-center bg-black/90 p-6">
+          <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-8">
+            <Image
+              source={{ uri: viewingCandidate?.image || DEFAULT_AVATAR }}
+              className="mx-auto h-32 w-32 rounded-3xl border-2 border-[#f1c40f] bg-black"
+            />
+            <Text className="mt-4 text-center text-3xl font-bold text-white">
+              {viewingCandidate?.name}
+            </Text>
+            <Text className="mb-1 text-center text-sm font-bold uppercase tracking-widest text-[#f1c40f]">
+              {viewingCandidate?.position}
+            </Text>
+            <Text className="mb-4 text-center text-xs uppercase text-gray-400">
+              {viewingCandidate?.course} • Year {viewingCandidate?.year}
+            </Text>
+            <Text className="mb-2 text-center text-xs italic text-gray-500">
+              Background & Achievements
+            </Text>
+            <Text className="text-sm leading-5 text-gray-300">
+              {viewingCandidate?.background || 'No platform information provided.'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setViewingCandidate(null)}
+              className="mt-8 items-center rounded-xl bg-[#f1c40f] p-4">
+              <Text className="font-black text-black">CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
 };
 
 export default VoterScreen;

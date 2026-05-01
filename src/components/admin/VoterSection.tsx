@@ -380,7 +380,7 @@ export const VoterSection = ({
           {isProcessing ? (
             <ActivityIndicator color="black" />
           ) : (
-            <Text className="text-base font-bold uppercase text-black">Add Voter</Text>
+            <Text className="text-base font-bold uppercase text-black">AddVoter</Text>
           )}
         </TouchableOpacity>
       </View>
