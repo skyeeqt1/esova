@@ -10,8 +10,13 @@ npm-debug.*
 *.orig.*
 web-build/
 
+# Environment variables & secrets — never commit
+.env
+.env.*
+!.env.example
 
-
+# Build artifacts
+*.tsbuildinfo
 
 ios
 android

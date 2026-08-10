@@ -5,6 +5,62 @@
 
 @layer base {
   body {
-    @apply bg-[#121212];
+    @apply bg-surface-950;
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  /* Cards — layered raised surface with a subtle top highlight */
+  .card {
+    @apply rounded-2xl border border-white/[0.06] bg-surface-800;
+  }
+  .card-tinted {
+    @apply rounded-2xl border border-primary-500/20 bg-primary-500/[0.07];
+  }
+
+  /* Text inputs & textareas */
+  .input {
+    @apply rounded-xl border border-white/[0.08] bg-surface-850 px-4 py-3.5 text-base text-white;
+  }
+  .input:focus {
+    @apply border-primary-500/60 bg-primary-500/[0.04];
+  }
+
+  /* Field labels */
+  .label {
+    @apply mb-2 ml-1 text-xs font-semibold uppercase tracking-eyebrow text-slate-500;
+  }
+
+  /* Buttons — .btn is the shared shell, pair with a variant */
+  .btn {
+    @apply flex-row items-center justify-center rounded-xl px-5 py-3.5 active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply bg-primary-500 active:bg-primary-600;
+  }
+  .btn-accent {
+    @apply bg-accent-400 active:bg-accent-500;
+  }
+  .btn-ghost {
+    @apply border border-white/10 bg-white/[0.04] active:bg-white/[0.08];
+  }
+  .btn-danger {
+    @apply border border-rose-500/30 bg-rose-500/10 active:bg-rose-500/20;
+  }
+
+  /* Pill chips */
+  .chip {
+    @apply rounded-full px-3.5 py-1.5 text-xs font-semibold;
+  }
+
+  /* Eyebrow / overline label */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500;
+  }
+
+  /* Hairline divider */
+  .divider {
+    @apply h-px w-full bg-white/[0.06];
   }
 }

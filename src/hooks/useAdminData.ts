@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Platform, Alert } from 'react-native';
 import { supabase } from '../config/supabase';
 
-export const DEFAULT_AVATAR = "https://via.placeholder.com/150";
-export const POSITIONS = ["President", "VP", "Secretary", "Treasurer"];
+export const DEFAULT_AVATAR = 'https://via.placeholder.com/150';
+export const POSITIONS = ['President', 'VP', 'Secretary', 'Treasurer'];
 
 interface Voter {
   id: string;
@@ -40,17 +40,17 @@ export const useAdminData = (adminEmail: string = '') => {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentAdminEmail, setCurrentAdminEmail] = useState(adminEmail);
+  const [currentAdminEmail] = useState(adminEmail);
 
   useEffect(() => {
     setIsLoading(true);
-    
+
     // Fetch voters
     fetchVoters();
-    
+
     // Fetch candidates
     fetchCandidates();
-    
+
     // Fetch admin logs
     fetchLogs();
 
@@ -85,11 +85,8 @@ export const useAdminData = (adminEmail: string = '') => {
 
   const fetchVoters = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'voter');
-      
+      const { data, error } = await supabase.from('users').select('*').eq('role', 'voter');
+
       if (error) throw error;
       setVoters(data || []);
     } catch (error: any) {
@@ -99,10 +96,8 @@ export const useAdminData = (adminEmail: string = '') => {
 
   const fetchCandidates = async () => {
     try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*');
-      
+      const { data, error } = await supabase.from('candidates').select('*');
+
       if (error) throw error;
       setCandidates(data || []);
       setIsLoading(false);
@@ -119,7 +114,7 @@ export const useAdminData = (adminEmail: string = '') => {
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(50);
-      
+
       if (error) throw error;
       setLogs(data || []);
     } catch (error: any) {
@@ -127,15 +122,13 @@ export const useAdminData = (adminEmail: string = '') => {
     }
   };
 
-  const handleListenerError = (error: any, type: string) => {
-    console.error(`${type} error:`, error);
-    const msg = error.message || `Error fetching ${type}`;
-    Platform.OS === 'web' ? alert(msg) : Alert.alert("Error", msg);
-    setIsLoading(false);
-  };
-
   // Helper function to add admin log
-  const addAdminLog = async (action: string, targetName: string, targetId: string, reason: string) => {
+  const addAdminLog = async (
+    action: string,
+    targetName: string,
+    targetId: string,
+    reason: string
+  ) => {
     await supabase.from('admin_logs').insert({
       action,
       target_name: targetName,
@@ -146,14 +139,18 @@ export const useAdminData = (adminEmail: string = '') => {
     });
   };
 
-  const handleDeleteItem = async (collectionName: string, id: string, extraData?: { name: string, studentId: string, reason: string }) => {
+  const handleDeleteItem = async (
+    collectionName: string,
+    id: string,
+    extraData?: { name: string; studentId: string; reason: string }
+  ) => {
     const performDelete = async () => {
       setIsProcessing(true);
       try {
         // Get candidate info before deletion for logging
         let targetName = '';
         let targetId = '';
-        
+
         if (collectionName === 'candidates') {
           const { data: candidateData } = await supabase
             .from('candidates')
@@ -168,36 +165,37 @@ export const useAdminData = (adminEmail: string = '') => {
 
         // Log based on collection type (only log candidates here, voters are logged in VoterSection)
         if (collectionName === 'candidates') {
-          await addAdminLog("DELETE_CANDIDATE", targetName, targetId, "Candidate removed by admin");
+          await addAdminLog('DELETE_CANDIDATE', targetName, targetId, 'Candidate removed by admin');
         }
 
-        const { error } = await supabase
-          .from(collectionName)
-          .delete()
-          .eq('id', id);
-        
+        const { error } = await supabase.from(collectionName).delete().eq('id', id);
+
         if (error) throw error;
-        
-        const msg = "Record deleted successfully";
-        Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
+
+        const msg = 'Record deleted successfully';
+        if (Platform.OS === 'web') {
+          alert(msg);
+        } else {
+          Alert.alert('Success', msg);
+        }
       } catch (e: any) {
-        handleActionError(e, "Delete");
-      } finally { 
-        setIsProcessing(false); 
+        handleActionError(e, 'Delete');
+      } finally {
+        setIsProcessing(false);
       }
     };
 
     if (!extraData) {
-        if (Platform.OS === 'web') {
-            if (window.confirm("Delete record? This cannot be undone.")) await performDelete();
-        } else {
-            Alert.alert('Confirm', 'Delete record? This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' }, 
-                { text: 'Delete', onPress: performDelete, style: 'destructive' }
-            ]);
-        }
+      if (Platform.OS === 'web') {
+        if (window.confirm('Delete record? This cannot be undone.')) await performDelete();
+      } else {
+        Alert.alert('Confirm', 'Delete record? This cannot be undone.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', onPress: performDelete, style: 'destructive' },
+        ]);
+      }
     } else {
-        await performDelete();
+      await performDelete();
     }
   };
 
@@ -213,7 +211,7 @@ export const useAdminData = (adminEmail: string = '') => {
             .eq('id', candidate.id);
           if (error) throw error;
         }
-        
+
         // Reset all voters' voted status
         for (const voter of voters) {
           const { error } = await supabase
@@ -222,33 +220,37 @@ export const useAdminData = (adminEmail: string = '') => {
             .eq('id', voter.id);
           if (error) throw error;
         }
-        
+
         // Log the reset action
         await supabase.from('admin_logs').insert({
-            action: "RESET_ELECTION",
-            target_name: "All Data",
-            target_id: "SYSTEM",
-            reason: "Admin initiated total reset",
-            admin_email: currentAdminEmail,
-            timestamp: new Date().toISOString(),
+          action: 'RESET_ELECTION',
+          target_name: 'All Data',
+          target_id: 'SYSTEM',
+          reason: 'Admin initiated total reset',
+          admin_email: currentAdminEmail,
+          timestamp: new Date().toISOString(),
         });
 
-        const msg = "Election reset successfully";
-        Platform.OS === 'web' ? alert(msg) : Alert.alert("Success", msg);
+        const msg = 'Election reset successfully';
+        if (Platform.OS === 'web') {
+          alert(msg);
+        } else {
+          Alert.alert('Success', msg);
+        }
       } catch (e: any) {
-        handleActionError(e, "Reset");
-      } finally { 
-        setIsProcessing(false); 
+        handleActionError(e, 'Reset');
+      } finally {
+        setIsProcessing(false);
       }
     };
 
-    const resetMsg = "Reset election? This will reset all votes and voter status.";
+    const resetMsg = 'Reset election? This will reset all votes and voter status.';
     if (Platform.OS === 'web') {
       if (window.confirm(resetMsg)) await performReset();
     } else {
       Alert.alert('Reset Election', resetMsg, [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', onPress: performReset, style: 'destructive' }
+        { text: 'Reset', onPress: performReset, style: 'destructive' },
       ]);
     }
   };
@@ -256,28 +258,28 @@ export const useAdminData = (adminEmail: string = '') => {
   const handleActionError = (e: any, type: string) => {
     console.error(`${type} error:`, e);
     const errorMsg = e.message || `Error during ${type.toLowerCase()}`;
-    Platform.OS === 'web' ? alert(errorMsg) : Alert.alert("Error", errorMsg);
+    if (Platform.OS === 'web') {
+      alert(errorMsg);
+    } else {
+      Alert.alert('Error', errorMsg);
+    }
   };
 
   // Refresh function to manually refresh all data
   const refreshData = async () => {
-    await Promise.all([
-      fetchVoters(),
-      fetchCandidates(),
-      fetchLogs()
-    ]);
+    await Promise.all([fetchVoters(), fetchCandidates(), fetchLogs()]);
   };
 
-  return { 
-    voters, 
-    candidates, 
+  return {
+    voters,
+    candidates,
     logs,
-    isProcessing, 
-    setIsProcessing, 
+    isProcessing,
+    setIsProcessing,
     isLoading,
-    handleDeleteItem, 
+    handleDeleteItem,
     handleResetElection,
     refreshData,
-    currentAdminEmail
+    currentAdminEmail,
   };
 };

@@ -5,14 +5,17 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../config/supabase';
+import { verifyPassword } from '../utils/password';
+import GradientButton from '../components/GradientButton';
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -44,24 +47,20 @@ const LoginScreen = ({ navigation }: any) => {
 
   const isLockedOut = lockoutEndTime !== null && lockoutEndTime > Date.now();
 
-  // Check if user is admin by trying Supabase Auth login
   const checkAdminUser = async (userEmail: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: userEmail,
       password,
     });
 
-    // If auth succeeds, user is an admin
     if (!error && data.user) {
       return { isAdmin: true, user: data.user };
     }
 
-    // If auth failed with invalid credentials, user might be a voter
     if (error?.message?.includes('Invalid login credentials')) {
       return { isAdmin: false, user: null };
     }
 
-    // Other errors - return the error
     throw error;
   };
 
@@ -81,7 +80,6 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       const userInput = email.toLowerCase().trim();
 
-      // Check if admin by trying Supabase Auth first (only if it looks like an email)
       const isEmail = userInput.includes('@');
       let adminCheck = null;
 
@@ -90,7 +88,6 @@ const LoginScreen = ({ navigation }: any) => {
       }
 
       if (isEmail && adminCheck?.isAdmin) {
-        // Admin login successful
         setFailedAttempts(0);
         setLockoutEndTime(null);
         navigation.replace('AdminDashboard', { adminEmail: userInput });
@@ -98,18 +95,14 @@ const LoginScreen = ({ navigation }: any) => {
         return;
       }
 
-      // Student login - verify against users table (NOT Supabase Auth)
-      // Try to find by email OR student_id
       let userData = null;
       let userError = null;
 
       if (isEmail) {
-        // If it looks like an email, search by email
         const result = await supabase.from('users').select('*').eq('email', userInput).single();
         userData = result.data;
         userError = result.error;
       } else {
-        // Otherwise search by student_id
         const result = await supabase
           .from('users')
           .select('*')
@@ -126,19 +119,17 @@ const LoginScreen = ({ navigation }: any) => {
         return;
       }
 
-      // Verify password against stored password
-      if (userData.password !== password) {
+      const isPasswordValid = await verifyPassword(userData.password, password);
+      if (!isPasswordValid) {
         handleFailedAttempt();
         Alert.alert('Access Denied', 'Invalid password.');
         setLoading(false);
         return;
       }
 
-      // Check if user needs to change password (first time login)
       if (userData.must_change_password) {
         setFailedAttempts(0);
         setLockoutEndTime(null);
-        // Navigate to password change screen first
         navigation.replace('ChangePassword', { voterData: userData });
         setLoading(false);
         return;
@@ -147,9 +138,8 @@ const LoginScreen = ({ navigation }: any) => {
       setFailedAttempts(0);
       setLockoutEndTime(null);
 
-      // Regular voter - go to VoterScreen with user data
       navigation.replace('VoterScreen', { voterData: userData });
-    } catch (error: any) {
+    } catch {
       handleFailedAttempt();
       Alert.alert('Error', 'Login failed. Please check your internet connection.');
     } finally {
@@ -180,51 +170,56 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#1a1a1a]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-surface-950" edges={['top']}>
+      <LinearGradient
+        colors={['#1d2544', '#0a0f1a', '#06090f']}
+        locations={[0, 0.45, 1]}
+        className="absolute inset-0"
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}>
           {/* Header Section */}
-          <View className="items-center px-6 pb-8 pt-16">
-            <View className="mb-4 rounded-full border-4 border-[#f1c40f] bg-white shadow-lg shadow-yellow-500/20">
+          <View className="items-center px-6 pb-8 pt-14">
+            <View className="mb-5 h-24 w-24 items-center justify-center rounded-[30px] border border-white/[0.1] bg-surface-800">
               <Image
                 source={require('../assets/logo.png')}
-                className="h-36 w-36"
+                className="h-16 w-16"
                 resizeMode="contain"
               />
             </View>
-<Text className="text-3xl sm:text-5xl font-black italic tracking-tighter text-[#f1c40f]">
+            <Text className="text-4xl font-bold tracking-tight text-white">
               E-SOVA
+              <Text className="text-amber-400">.</Text>
             </Text>
-            <Text className="mt-1 text-lg font-medium text-gray-400">
-              ESCR Student Organization Voting Application
+            <Text className="mt-2 text-center text-sm text-slate-400">
+              ESCR Student Organization
+              {'\n'}Voting Application
             </Text>
           </View>
 
           {/* Login Form Card */}
           <View className="flex-1 px-6">
-            <View className="rounded-3xl border border-gray-800 bg-[#252525] p-6 shadow-xl">
-            <Text className="text-xl sm:text-2xl font-bold text-white">
-              Welcome Back
-            </Text>
-            <Text className="mb-6 text-base text-gray-500">Please sign in to continue</Text>
+            <View className="card p-6">
+              <Text className="text-xl font-semibold text-white">Welcome back</Text>
+              <Text className="mb-6 mt-1 text-sm text-slate-400">
+                Sign in with your email or student ID to continue.
+              </Text>
 
               {/* Email Field */}
               <View className="mb-4">
-                <Text className="mb-2 ml-1 text-base font-bold uppercase text-gray-400">
-                  Email Address
-                </Text>
-                <View className="flex-row items-center rounded-xl border border-gray-700 bg-[#1a1a1a]">
-                  <View className="px-3">
-                    <Text className="text-xl text-gray-500">📧</Text>
+                <Text className="label">Email or Student ID</Text>
+                <View className="flex-row items-center rounded-xl border border-white/[0.08] bg-surface-850 focus-within:border-violet-500/60">
+                  <View className="pl-4">
+                    <Ionicons name="mail-outline" size={18} color="#64748b" />
                   </View>
                   <TextInput
                     placeholder="Enter your email or Student ID"
-                    placeholderTextColor="#555"
+                    placeholderTextColor="#5b6472"
                     autoCapitalize="none"
                     keyboardType="email-address"
-                    className="flex-1 p-4 text-base sm:text-lg text-white"
+                    className="flex-1 px-3 py-3.5 text-base text-white"
                     value={email}
                     onChangeText={setEmail}
                   />
@@ -233,49 +228,43 @@ const LoginScreen = ({ navigation }: any) => {
 
               {/* Password Field */}
               <View className="mb-6">
-                <Text className="mb-2 ml-1 text-base font-bold uppercase text-gray-400">
-                  Password
-                </Text>
-                <View className="flex-row items-center rounded-xl border border-gray-700 bg-[#1a1a1a]">
-                  <View className="px-3">
-                    <Text className="text-xl text-gray-500">🔒</Text>
+                <Text className="label">Password</Text>
+                <View className="flex-row items-center rounded-xl border border-white/[0.08] bg-surface-850 focus-within:border-violet-500/60">
+                  <View className="pl-4">
+                    <Ionicons name="lock-closed-outline" size={18} color="#64748b" />
                   </View>
                   <TextInput
                     placeholder="Enter your password"
-                    placeholderTextColor="#555"
+                    placeholderTextColor="#5b6472"
                     secureTextEntry={!showPassword}
-                    className="flex-1 p-4 text-base sm:text-lg text-white"
+                    className="flex-1 px-3 py-3.5 text-base text-white"
                     value={password}
                     onChangeText={setPassword}
                   />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="px-3">
-                    <Text className="text-xl text-gray-500">{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="px-4">
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={18}
+                      color="#64748b"
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Login Button */}
-              <TouchableOpacity
+              <GradientButton
                 onPress={handleLogin}
                 disabled={loading || isLockedOut}
-                className={`rounded-xl border-b-4 border-yellow-700 bg-[#f1c40f] p-4 shadow-lg shadow-yellow-500/20 active:bg-yellow-500 ${isLockedOut ? 'opacity-50' : ''}`}>
-                {loading ? (
-                  <ActivityIndicator color="#000" />
-                ) : isLockedOut ? (
-                  <Text className="text-center text-xl font-black uppercase italic text-black">
-                    Locked ({timeLeft})
-                  </Text>
-                ) : (
-                  <Text className="text-center text-xl font-black uppercase italic text-black">
-                    Sign In
-                  </Text>
-                )}
-              </TouchableOpacity>
+                loading={loading}
+                label={isLockedOut ? `Locked (${timeLeft})` : 'Sign In'}
+                icon={isLockedOut ? 'timer-outline' : 'log-in-outline'}
+              />
 
               {/* Attempts Warning */}
               {failedAttempts > 0 && !isLockedOut && (
-                <View className="mt-4 items-center">
-                  <Text className="text-base font-bold text-yellow-500">
+                <View className="mt-4 flex-row items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                  <Ionicons name="warning-outline" size={16} color="#fbbf24" />
+                  <Text className="ml-2 text-sm font-semibold text-amber-300">
                     {5 - failedAttempts} attempt{5 - failedAttempts !== 1 ? 's' : ''} remaining
                   </Text>
                 </View>
@@ -283,9 +272,10 @@ const LoginScreen = ({ navigation }: any) => {
 
               {/* Lockout Message */}
               {isLockedOut && (
-                <View className="mt-4 items-center rounded-xl bg-red-500/20 p-3">
-                  <Text className="text-center text-base font-bold text-red-500">
-                    Too many failed attempts.{'\n'}Please wait {timeLeft} to try again.
+                <View className="mt-4 items-center rounded-xl border border-rose-500/20 bg-rose-500/10 p-3">
+                  <Ionicons name="lock-closed" size={16} color="#fb7185" />
+                  <Text className="mt-1 text-center text-sm font-semibold text-rose-300">
+                    Too many failed attempts. Please wait {timeLeft} to try again.
                   </Text>
                 </View>
               )}
@@ -293,9 +283,10 @@ const LoginScreen = ({ navigation }: any) => {
 
             {/* Footer */}
             <View className="mb-8 mt-8 items-center">
-              <View className="rounded-full border border-red-500/20 bg-red-500/10 px-4 py-2">
-                <Text className="text-base font-bold uppercase tracking-widest text-red-500">
-                  🔒 Authorized Personnel Only
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="shield-checkmark-outline" size={14} color="#64748b" />
+                <Text className="text-xs font-semibold text-slate-500">
+                  Secure & Confidential Voting
                 </Text>
               </View>
             </View>

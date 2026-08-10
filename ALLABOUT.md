@@ -38,18 +38,17 @@
 - **Styling**: Tailwind CSS 3.4 + NativeWind 4.2
 
 ### Backend Services
-- **Authentication**: Firebase Authentication
-- **Database**: Firebase Firestore (NoSQL)
-- **Storage**: Firebase Storage + Supabase Storage
-- **Backend Admin**: Firebase Admin SDK 13.6
+- **Database**: Supabase Postgres (NoSQL-style JSONB documents)
+- **Storage**: Supabase Storage (candidate images)
+- **Auth**: Supabase Auth (admin sessions); voter credentials validated against salted hashes in the `users` table
 
 ### Key Dependencies
 | Package | Version | Purpose |
 |---------|---------|---------|
 | expo | ^54.0.0 | Development framework |
 | react-native | 0.81.5 | Mobile framework |
-| firebase | ^12.8.0 | Firebase services |
-| firebase-admin | ^13.6.0 | Server-side Firebase |
+| firebase | n/a | Removed (Supabase only) |
+| firebase-admin | n/a | Removed (server-side only, must never ship in client bundles) |
 | @supabase/supabase-js | ^2.93.3 | Supabase client |
 | react-native-svg | 15.12.1 | SVG rendering |
 | react-native-chart-kit | ^6.12.0 | Charts for voting results |
@@ -61,8 +60,9 @@
 | expo-file-system | ~19.0.21 | File operations |
 | expo-print | ~15.0.8 | Printing support |
 | expo-sharing | ~14.0.8 | Sharing functionality |
+| expo-crypto | ~15.0.x | Password hashing |
+| expo-clipboard | ~8.x | Clipboard access |
 | papaparse | ^5.5.3 | CSV parsing |
-| csv-parser | ^3.2.0 | CSV parsing |
 | base64-arraybuffer | ^1.0.2 | Base64 encoding |
 
 ### Development Tools
@@ -84,10 +84,10 @@
 │  ├── LoginScreen (Authentication)                       │
 │  ├── AdminDashboard (Election Management)              │
 │  ├── VoterScreen (Voting Interface)                    │
-│  └── VoterProfile (User Profile)                        │
+│  └── ChangePasswordScreen (First Login)                │
 ├─────────────────────────────────────────────────────────┤
 │  Components (Admin):                                     │
-│  ├── OverviewSection (Statistics & Charts)             │
+│  ├── OverviewSection (Statistics & Controls)           │
 │  ├── CandidateSection (Manage Candidates)              │
 │  ├── VoterSection (Manage Voters)                      │
 │  └── AdminLogsSection (Audit Logs)                      │
@@ -96,11 +96,11 @@
 ├─────────────────────────────────────────────────────────┤
 │                    Backend Services                      │
 ├──────────────────┬──────────────────┬───────────────────┤
-│    Firebase      │   Supabase       │    Local          │
+│    Supabase      │    Supabase      │      Local        │
 │  ┌────────────┐ │ ┌────────────┐  │ ┌───────────────┐  │
-│  │ Auth       │ │ │ Storage    │  │ │ CSV Import    │  │
-│  │ Firestore  │ │ │ (Images)  │  │ │ Scripts       │  │
-│  │ Storage    │ │ └────────────┘  │ └───────────────┘  │
+│  │ Postgres   │ │ │ Storage    │  │ │ CSV Import    │  │
+│  │ Realtime   │ │ │ (Images)   │  │ │ (PapaParse)   │  │
+│  │ Auth       │ │ └────────────┘  │ └───────────────┘  │
 │  └────────────┘ │                  │                    │
 └──────────────────┴──────────────────┴───────────────────┘
 ```
@@ -131,35 +131,32 @@ SOVA-current/
 │
 ├── src/
 │   ├── config/
-│   │   ├── firebase.ts              # Firebase configuration
-│   │   └── supabase.js              # Supabase configuration
+│   │   └── supabase.ts               # Supabase configuration
+│   │
+│   ├── utils/
+│   │   └── password.ts               # Password hashing (expo-crypto)
 │   │
 │   ├── screens/
-│   │   ├── LoginScreen.tsx          # User authentication
-│   │   ├── AdminDashboard.tsx       # Admin control panel
-│   │   ├── VoterScreen.tsx          # Voting interface
-│   │   └── VoterProfile.tsx          # Voter profile
+│   │   ├── LoginScreen.tsx           # User authentication
+│   │   ├── AdminDashboard.tsx        # Admin control panel
+│   │   ├── VoterScreen.tsx           # Voting interface
+│   │   └── ChangePasswordScreen.tsx  # First-time password change
 │   │
 │   ├── components/
 │   │   └── admin/
-│   │       ├── AdminLogsSection.tsx # Admin audit logs
-│   │       ├── CandidateSection.tsx # Candidate management
-│   │       ├── OverviewSection.tsx  # Dashboard overview
-│   │       └── VoterSection.tsx     # Voter management
+│   │       ├── AdminLogsSection.tsx  # Admin audit logs
+│   │       ├── CandidateSection.tsx  # Candidate management
+│   │       ├── OverviewSection.tsx   # Dashboard overview
+│   │       └── VoterSection.tsx      # Voter management
 │   │
 │   ├── hooks/
-│   │   └── useAdminData.ts          # Admin data hook
+│   │   └── useAdminData.ts           # Admin data hook
 │   │
-│   ├── img/
-│   │   ├── escrlogo.png             # ESCR logo
-│   │   └── tg.jpg                   # Background image
+│   ├── assets/
+│   │   └── logo.png                  # App logo
 │   │
-│   └── scripts/
-│       ├── importUsers.js           # User import script
-│       ├── serviceAccountKey.json   # Firebase admin key
-│       └── students.csv             # Sample students data
-│
-└── components/                      # Shared components
+│   └── types/
+└── components/                       # Shared components
     ├── Container.tsx
     ├── EditScreenInfo.tsx
     └── ScreenContent.tsx
@@ -169,18 +166,20 @@ SOVA-current/
 
 ## Configuration & Backend Services
 
-### Firebase Configuration
-- **Project ID**: `sova-a5fc9`
-- **Auth Domain**: `sova-a5fc9.firebaseapp.com`
-- **Storage Bucket**: `sova-a5fc9.firebasestorage.app`
-- **API Key**: `AIzaSyBsAqdHWPeEgTa1KhfbVH55LU4Mj-FNtfg`
-- **Messaging Sender ID**: `295512479205`
-- **App ID**: `1:295512479205:web:a1ba0faec967698df58b0c`
+> **⚠️ SECURITY NOTICE**
+> Live API keys and credentials were previously committed to this repository. They
+> have been scrubbed from this document. If you forked or cloned this project before
+> this cleanup, treat all previously exposed keys as compromised and rotate them:
+> - Supabase: rotate the anon key in the Supabase dashboard
+> - Firebase: rotate/disable the old Firebase project credentials
+>
+> The project now uses **Supabase only** (client can be configured via `.env`).
+> See `.env.example` for the required variables. Never commit `.env` or service keys.
 
 ### Supabase Configuration
-- **Project URL**: `https://vcluoryjyqsbupracgqh.supabase.co`
-- **Storage Bucket**: `candidate-profiles` (for candidate images)
-- **Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjbHVvcnlqeXFzYnVwcmFjZ3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3MzY1MzcsImV4cCI6MjA4NTMxMjUzN30.8gNW7cyxgUygQkmWPijb5bBP3kFowvsbkMcjcaoxLpE`
+- The live Supabase client config is loaded from the environment in `src/config/supabase.ts`.
+- Copy `.env.example` to `.env` and fill in your own `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`.
+- Storage bucket used by the app: `candidate-images` (defined in `src/config/supabase.ts`).
 
 ---
 
@@ -193,14 +192,16 @@ Stores voter and admin user accounts.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Auto-generated document ID (matches Firebase Auth UID) |
+| `id` | string | Record ID (matches admin Supabase Auth UID when applicable) |
 | `name` | string | Full name of the voter |
-| `email` | string | User email address (used for Firebase Auth) |
-| `studentId` | string | Unique student identification number |
+| `email` | string | User email address |
+| `student_id` | string | Unique student identification number |
 | `role` | string | User role: `"voter"` or `"admin"` |
-| `hasVoted` | boolean | Whether the user has submitted their ballot |
+| `has_voted` | boolean | Whether the user has submitted their ballot |
 | `ballot` | object/null | Completed ballot (JSON object with position votes) |
-| `votedAt` | timestamp/null | When the user cast their vote |
+| `voted_at` | timestamp/null | When the user cast their vote |
+| `password` | string | Salted hash (`salt$hash`) — never plain text |
+| `must_change_password` | boolean | Forces password change on first login |
 
 #### 2. `candidates` Collection
 Stores all candidates running for office.
@@ -224,11 +225,12 @@ Audit trail for administrative actions.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Auto-generated document ID |
+| `id` | string | Record ID |
 | `action` | string | Action type: `"DELETE_VOTER"`, `"RESET_ELECTION"`, etc. |
-| `targetName` | string | Name of the affected entity |
-| `targetId` | string | ID of the affected entity |
+| `target_name` | string | Name of the affected entity |
+| `target_id` | string | ID of the affected entity |
 | `reason` | string | Admin-provided reason for the action |
+| `admin_email` | string | Email of the admin who performed the action |
 | `timestamp` | timestamp | When the action occurred |
 
 #### 4. `settings` Collection
@@ -272,8 +274,8 @@ LoginScreen
 ### Screen Details
 
 #### 1. LoginScreen (`src/screens/LoginScreen.tsx`)
-- User authentication with Firebase Auth
-- Email/password login
+- Authentication: admins via Supabase Auth, voters via hashed credential lookup in `users`
+- Email/Student ID + password login
 - Failed attempt tracking with lockout protection
 - Role-based routing (admin vs voter)
 - Features:
@@ -293,7 +295,7 @@ LoginScreen
   - Audit log viewing
   - Logout functionality
 - Theme: Dark mode with green (#00b894) accents
-- Logo: ESCR (with escrlogo.png)
+- Logo: ESCR (logo.png in src/assets)
 
 #### 3. VoterScreen (`src/screens/VoterScreen.tsx`)
 - Main voting interface for voters
@@ -304,28 +306,30 @@ LoginScreen
   - View voting status
   - Check if already voted
 
+#### 4. ChangePasswordScreen (`src/screens/ChangePasswordScreen.tsx`)
+- First-login password change flow
+- Passwords are stored as salted hashes (never plain text)
+
 #### 4. VoterProfile (`src/screens/VoterProfile.tsx`)
-- User profile display
-- Features:
-  - View personal information
-  - View voting history
-  - Ballot confirmation
+- (Previously planned profile screen — not present in the current codebase)
 
 ---
 
 ## Key Features
 
 ### Authentication
-- Firebase Auth-based login
+- Admin login via Supabase Auth
+- Voter login via salted-hash password lookup in the `users` table
 - Role-based access control (admin/voter)
-- Account lockout after failed attempts
-- Secure session management
+- Account lockout after failed attempts (client-side)
+- Passwords hashed with sha256 + salt (expo-crypto) — never plain text
 
 ### Voting System
-- One vote per user (hasVoted flag)
-- Multi-position voting (President, VP, Secretary, Treasurer)
+- One vote per user (has_voted flag)
+- Multi-position voting (President, VP, Secretary, Treasurer + custom positions)
 - Ballot tracking with timestamps
 - Vote confirmation
+- Atomic vote casting via `cast_vote` RPC (with fallback path)
 
 ### Admin Capabilities
 1. **Overview Section**
@@ -388,25 +392,18 @@ LoginScreen
 
 ## API Keys & Credentials
 
-### Firebase (Client-Side)
-```
-API Key: AIzaSyBsAqdHWPeEgTa1KhfbVH55LU4Mj-FNtfg
-Auth Domain: sova-a5fc9.firebaseapp.com
-Project ID: sova-a5fc9
-Storage Bucket: sova-a5fc9.firebasestorage.app
-Messaging Sender ID: 295512479205
-App ID: 1:295512479205:web:a1ba0faec967698df58b0c
-```
+> **⚠️ SECURITY NOTICE**
+> All live credentials have been removed from this document. Configure the app via
+> local environment variables only (see `.env.example`).
 
-### Supabase
-```
-Project URL: https://vcluoryjyqsbupracgqh.supabase.co
-Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+### Supabase (Client-Side)
+- Stored in `.env`: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY`
+- Never commit real keys to the repository.
 
-### Firebase Admin (Server-Side)
-- Service account key file: `src/scripts/serviceAccountKey.json`
-- Used for: Batch operations, user management, privileged operations
+### Firebase
+- Firebase is **no longer used** by this project. Any legacy Firebase service keys
+  (e.g. `serviceAccountKey.json`) must not be committed — add `*.json` service key
+  files to `.gitignore` and rotate them if they were ever exposed.
 
 ---
 
@@ -476,9 +473,8 @@ npx expo prebuild
 
 ## Summary
 
-E-SOVA is a comprehensive electronic voting system built with modern technologies. It leverages Firebase for authentication and database, Supabase for image storage, and React Native/Expo for the mobile interface. The system provides secure voting with role-based access, real-time monitoring, and complete audit trails for administrative actions.
+E-SOVA is a comprehensive electronic voting system built with modern technologies. It leverages Supabase for database, realtime updates and image storage, with salted password hashing for voter credentials, and React Native/Expo for the mobile interface. The system provides secure voting with role-based access, real-time monitoring, and complete audit trails for administrative actions.
 
 ---
 
 *Document generated automatically from system analysis*
-*Project Location: c:/Users/alago/Documents/appvoting/SOVA-current*

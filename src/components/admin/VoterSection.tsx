@@ -9,18 +9,15 @@ import {
   Platform,
   ScrollView,
   Modal,
-  Clipboard,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../config/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as Clipboard from 'expo-clipboard';
 import Papa from 'papaparse';
-
-interface FilePickerResult {
-  assets: Array<{ uri: string }>;
-  canceled: boolean;
-}
+import { hashPassword } from '../../utils/password';
 
 export const VoterSection = ({
   voters,
@@ -41,7 +38,6 @@ export const VoterSection = ({
 
   // --- UI STATES ---
   const [searchQuery, setSearchQuery] = useState('');
-  const [importProgress, setImportProgress] = useState('');
   const [isRemoveModalVisible, setIsRemoveModalVisible] = useState(false);
   const [voterToRemove, setVoterToRemove] = useState<any>(null);
   const [removalReason, setRemovalReason] = useState('');
@@ -49,6 +45,7 @@ export const VoterSection = ({
   const [voterToReset, setVoterToReset] = useState<any>(null);
   const [newResetPassword, setNewResetPassword] = useState('');
   const [isPasswordReset, setIsPasswordReset] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -71,7 +68,11 @@ export const VoterSection = ({
   const handleAddVoter = async () => {
     if (!voterName.trim() || !voterID.trim() || !voterEmail.trim() || !voterPassword.trim()) {
       const msg = 'All fields are required';
-      Platform.OS === 'web' ? alert(msg) : Alert.alert('Required Fields', msg);
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert('Required Fields', msg);
+      }
       return;
     }
 
@@ -87,7 +88,7 @@ export const VoterSection = ({
         has_voted: false,
         ballot: null,
         voted_at: null,
-        password: voterPassword.trim(), // Store password in table
+        password: await hashPassword(voterPassword.trim()),
         must_change_password: true, // Force password change on first login
       });
 
@@ -97,7 +98,11 @@ export const VoterSection = ({
           dbError.code === '23505'
             ? 'This Student ID is already registered. Please use a different ID.'
             : dbError.message;
-        Platform.OS === 'web' ? alert(errorMessage) : Alert.alert('Error', errorMessage);
+        if (Platform.OS === 'web') {
+          alert(errorMessage);
+        } else {
+          Alert.alert('Error', errorMessage);
+        }
         setIsProcessing(false);
         return;
       }
@@ -114,9 +119,11 @@ export const VoterSection = ({
 
       if (logError) {
         console.error('Failed to add log:', logError);
-        Platform.OS === 'web'
-          ? alert('Log Error: ' + logError.message)
-          : Alert.alert('Log Error', 'Could not add activity log: ' + logError.message);
+        if (Platform.OS === 'web') {
+          alert('Log Error: ' + logError.message);
+        } else {
+          Alert.alert('Log Error', 'Could not add activity log: ' + logError.message);
+        }
       }
 
       // Refresh logs to show new entry
@@ -128,9 +135,14 @@ export const VoterSection = ({
       setVoterID('');
       setVoterEmail('');
       setVoterPassword('');
+      setShowForm(false);
 
       const msg = `Student ${voterName} added successfully!`;
-      Platform.OS === 'web' ? alert(msg) : Alert.alert('Success', msg);
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert('Success', msg);
+      }
 
       // Refresh data if function provided
       if (refreshData) {
@@ -138,21 +150,13 @@ export const VoterSection = ({
       }
     } catch (e: any) {
       const errorMsg = e.message || 'An error occurred';
-      Platform.OS === 'web' ? alert(errorMsg) : Alert.alert('Error', errorMsg);
+      if (Platform.OS === 'web') {
+        alert(errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     }
     setIsProcessing(false);
-  };
-
-  const confirmDelete = (voter: any) => {
-    setVoterToRemove(voter);
-    setIsRemoveModalVisible(true);
-  };
-
-  const confirmReset = (voter: any) => {
-    setVoterToReset(voter);
-    setIsResetModalVisible(true);
-    setIsPasswordReset(false); // Reset state to show confirmation first
-    setNewResetPassword('');
   };
 
   const generateAndResetPassword = async () => {
@@ -167,24 +171,28 @@ export const VoterSection = ({
       const { error: dbError } = await supabase
         .from('users')
         .update({
-          password: generatedPassword,
+          password: await hashPassword(generatedPassword),
           must_change_password: true, // Force password change on next login
         })
         .eq('id', voterToReset.id);
 
       if (dbError) {
         console.error('Database error:', dbError);
-        Platform.OS === 'web' ? alert(dbError.message) : Alert.alert('Error', dbError.message);
+        if (Platform.OS === 'web') {
+          alert(dbError.message);
+        } else {
+          Alert.alert('Error', dbError.message);
+        }
         setIsProcessing(false);
         return;
       }
 
-      // Log the password reset action
+      // Log the password reset action (never store the generated password in logs)
       const { error: logError } = await supabase.from('admin_logs').insert({
         action: 'RESET_PASSWORD',
         target_name: voterToReset.name,
         target_id: voterToReset.student_id,
-        reason: `Password reset by admin. New password: ${generatedPassword}`,
+        reason: 'Password reset by admin',
         admin_email: adminEmail,
         timestamp: new Date().toISOString(),
       });
@@ -202,16 +210,22 @@ export const VoterSection = ({
       setIsPasswordReset(true);
     } catch (e: any) {
       const errorMsg = e.message || 'An error occurred';
-      Platform.OS === 'web' ? alert(errorMsg) : Alert.alert('Error', errorMsg);
+      if (Platform.OS === 'web') {
+        alert(errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     }
     setIsProcessing(false);
   };
 
   const handleFinalDelete = async () => {
     if (!removalReason.trim()) {
-      Platform.OS === 'web'
-        ? alert('Reason is required')
-        : Alert.alert('Error', 'Please provide a reason.');
+      if (Platform.OS === 'web') {
+        alert('Reason is required');
+      } else {
+        Alert.alert('Error', 'Please provide a reason.');
+      }
       return;
     }
 
@@ -279,7 +293,6 @@ export const VoterSection = ({
           const records = results.data as any[];
           for (let i = 0; i < records.length; i++) {
             const row = records[i];
-            setImportProgress(`Importing ${i + 1}/${records.length}`);
             try {
               // Add directly to users table (NOT in Supabase Auth)
               const password = row.password || row.studentId || 'defaultPassword123';
@@ -289,7 +302,7 @@ export const VoterSection = ({
                 student_id: row.studentId,
                 role: 'voter',
                 has_voted: false,
-                password: password,
+                password: await hashPassword(password),
                 must_change_password: true, // Force password change on first login
               });
 
@@ -319,79 +332,51 @@ export const VoterSection = ({
           }
 
           setIsProcessing(false);
-          setImportProgress('');
           Alert.alert('Complete', 'Import finished.');
         },
       });
-    } catch (e) {
+    } catch {
       setIsProcessing(false);
     }
   };
 
+  const initials = (name: string) =>
+    name
+      .split(' ')
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
   return (
     <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
-      {/* ADD STUDENT FORM */}
-      <View className="mb-6 rounded-2xl border border-gray-800 bg-[#1e1e1e] p-5">
-        <Text className="mb-4 text-lg font-bold uppercase tracking-widest text-[#00b894]">
-          Register Student
-        </Text>
-        <TextInput
-          placeholder="Full Name"
-          placeholderTextColor="#444"
-          value={voterName}
-          onChangeText={setVoterName}
-          className="mb-3 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
-        />
-        <View className="mb-3 flex-row gap-2">
-          <TextInput
-            placeholder="Student ID"
-            placeholderTextColor="#444"
-            value={voterID}
-            onChangeText={setVoterID}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
-          />
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor="#444"
-            value={voterEmail}
-            onChangeText={setVoterEmail}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
-          />
+      {/* HEADER: LIST SUMMARY + ADD ACTION */}
+      <View className="mb-4 flex-row items-center justify-between">
+        <View>
+          <Text className="eyebrow">Voters</Text>
+          <Text className="text-lg font-semibold text-white">{voters.length} registered</Text>
         </View>
-        <View className="mb-4 flex-row gap-2">
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#444"
-            value={voterPassword}
-            onChangeText={setVoterPassword}
-            className="flex-1 rounded-lg border border-gray-800 bg-[#121212] p-4 text-lg text-white"
-          />
-          <TouchableOpacity
-            onPress={generateRandomPassword}
-            className="items-center justify-center rounded-lg bg-[#f1c40f] px-4">
-            <Text className="text-base font-bold text-black">GENERATE</Text>
-          </TouchableOpacity>
-        </View>
-
         <TouchableOpacity
-          onPress={handleAddVoter}
+          onPress={() => setShowForm(true)}
           disabled={isProcessing}
-          className="items-center rounded-xl bg-[#00b894] p-4">
-          {isProcessing ? (
-            <ActivityIndicator color="black" />
-          ) : (
-            <Text className="text-base font-bold uppercase text-black">AddVoter</Text>
-          )}
+          className="btn btn-primary px-4 py-2.5">
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text className="ml-1.5 text-sm font-semibold text-white">Add Student</Text>
         </TouchableOpacity>
       </View>
 
       {/* SEARCH BAR */}
-      <TextInput
-        placeholder="Search students..."
-        placeholderTextColor="#444"
-        onChangeText={setSearchQuery}
-        className="mb-4 rounded-xl border border-gray-800 bg-[#1e1e1e] p-4 text-lg text-white"
-      />
+      <View className="mb-4 flex-row items-center rounded-xl border border-white/[0.08] bg-surface-850">
+        <View className="pl-4">
+          <Ionicons name="search-outline" size={16} color="#64748b" />
+        </View>
+        <TextInput
+          placeholder="Search students..."
+          placeholderTextColor="#5b6472"
+          onChangeText={setSearchQuery}
+          className="flex-1 px-3 py-3.5 text-base text-white"
+        />
+      </View>
 
       {/* VOTER LIST */}
       {voters
@@ -403,22 +388,174 @@ export const VoterSection = ({
               setVoterToReset(v);
               setIsResetModalVisible(true);
             }}
-            className="mb-2 flex-row items-center rounded-xl border border-gray-800 bg-[#1e1e1e] p-4">
+            activeOpacity={0.9}
+            className="card mb-2.5 flex-row items-center p-4 active:scale-[0.98] active:bg-surface-750">
+            <View className="mr-3 h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-primary-500/15">
+              <Text className="text-xs font-bold text-primary-300">{initials(v.name)}</Text>
+            </View>
             <View className="flex-1">
-              <Text className="text-xl font-bold text-white" numberOfLines={1}>
+              <Text className="text-base font-semibold text-white" numberOfLines={1}>
                 {v.name}
               </Text>
-              <Text className="text-base font-bold uppercase text-gray-500">{v.student_id}</Text>
+              <Text className="text-xs font-semibold uppercase tracking-eyebrow text-slate-500">
+                {v.student_id}
+              </Text>
             </View>
             <View
-              className={`rounded px-3 py-1 ${v.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
-              <Text
-                className={`text-sm font-bold ${v.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>
-                {v.has_voted ? 'VOTED' : 'PENDING'}
-              </Text>
+              className={`rounded-full border px-3 py-1 ${
+                v.has_voted
+                  ? 'border-emerald-500/25 bg-emerald-500/10'
+                  : 'border-amber-500/25 bg-amber-500/10'
+              }`}>
+              <View className="flex-row items-center">
+                <View
+                  className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
+                    v.has_voted ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                />
+                <Text
+                  className={`text-[11px] font-bold uppercase tracking-eyebrow ${
+                    v.has_voted ? 'text-emerald-300' : 'text-amber-300'
+                  }`}>
+                  {v.has_voted ? 'Voted' : 'Pending'}
+                </Text>
+              </View>
             </View>
           </TouchableOpacity>
         ))}
+
+      {voters.filter((v: any) => v.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+        .length === 0 && (
+        <View className="items-center rounded-2xl border border-dashed border-white/[0.08] p-8">
+          <Ionicons name="people-outline" size={28} color="#334155" />
+          <Text className="mt-2 text-sm text-slate-500">No students found.</Text>
+        </View>
+      )}
+
+      {/* ADD STUDENT FORM MODAL */}
+      <Modal
+        visible={showForm}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setShowForm(false);
+          setVoterName('');
+          setVoterID('');
+          setVoterEmail('');
+          setVoterPassword('');
+        }}>
+        <View className="flex-1 justify-end bg-black/80">
+          <View className="max-h-[92%] overflow-hidden !rounded-t-3xl border-white/[0.1] bg-surface-900">
+            <View className="flex-row items-center justify-between border-b border-white/[0.06] p-5">
+              <View>
+                <Text className="eyebrow">Voter Registry</Text>
+                <Text className="text-lg font-semibold text-white">Register student</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowForm(false);
+                  setVoterName('');
+                  setVoterID('');
+                  setVoterEmail('');
+                  setVoterPassword('');
+                }}
+                className="h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-surface-850">
+                <Ionicons name="close" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
+              <Text className="label">Full Name</Text>
+              <TextInput
+                placeholder="Enter full name"
+                placeholderTextColor="#5b6472"
+                value={voterName}
+                onChangeText={setVoterName}
+                className="input mb-4"
+              />
+              <Text className="label">Student ID</Text>
+              <TextInput
+                placeholder="Enter student ID"
+                placeholderTextColor="#5b6472"
+                value={voterID}
+                onChangeText={setVoterID}
+                className="input mb-4"
+              />
+              <Text className="label">Email</Text>
+              <TextInput
+                placeholder="Enter email"
+                placeholderTextColor="#5b6472"
+                value={voterEmail}
+                onChangeText={setVoterEmail}
+                autoCapitalize="none"
+                className="input mb-4"
+              />
+
+              <Text className="label">Temporary Password</Text>
+              <View className="mb-5 flex-row items-center">
+                <TextInput
+                  placeholder="Enter password"
+                  placeholderTextColor="#5b6472"
+                  value={voterPassword}
+                  onChangeText={setVoterPassword}
+                  className="input mr-2 flex-1"
+                />
+                <TouchableOpacity
+                  onPress={generateRandomPassword}
+                  className="btn btn-accent px-4 py-3.5">
+                  <Ionicons name="dice-outline" size={16} color="#08090d" />
+                  <Text className="ml-1.5 text-xs font-bold text-black">GENERATE</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowForm(false);
+                    setVoterName('');
+                    setVoterID('');
+                    setVoterEmail('');
+                    setVoterPassword('');
+                  }}
+                  disabled={isProcessing}
+                  className="btn btn-ghost flex-1">
+                  <Text className="text-sm font-semibold text-slate-200">Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleAddVoter}
+                  disabled={isProcessing}
+                  className="btn btn-primary flex-1">
+                  {isProcessing ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="person-add-outline" size={18} color="#fff" />
+                      <Text className="ml-2 text-[15px] font-semibold text-white">Add Voter</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowForm(false);
+                  setVoterName('');
+                  setVoterID('');
+                  setVoterEmail('');
+                  setVoterPassword('');
+                  handleImportCSV();
+                }}
+                disabled={isProcessing}
+                className="btn btn-ghost mt-3">
+                <Ionicons name="cloud-upload-outline" size={16} color="#a5b4fc" />
+                <Text className="ml-2 text-sm font-semibold text-primary-200">
+                  Import Students from CSV
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* REMOVAL MODAL */}
       <Modal
@@ -431,31 +568,34 @@ export const VoterSection = ({
           setVoterToRemove(null);
         }}>
         <View className="flex-1 items-center justify-center bg-black/80 p-6">
-          <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
-            <Text className="mb-2 text-2xl font-bold text-white">
+          <View className="card w-full !rounded-3xl border-white/[0.1] p-6">
+            <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl border border-rose-500/25 bg-rose-500/10">
+              <Ionicons name="person-remove-outline" size={22} color="#fb7185" />
+            </View>
+            <Text className="mb-1 text-lg font-semibold text-white">
               Remove {voterToRemove?.name}?
             </Text>
-            <Text className="mb-4 text-base text-gray-500">
+            <Text className="mb-4 text-sm text-slate-400">
               Provide a reason for removal for the audit logs.
             </Text>
             <TextInput
               placeholder="e.g. Duplicate account, Transferred..."
-              placeholderTextColor="#444"
+              placeholderTextColor="#5b6472"
               value={removalReason}
               onChangeText={setRemovalReason}
               multiline
-              className="mb-6 h-24 rounded-xl border border-gray-800 bg-[#121212] p-4 text-lg text-white"
+              className="input mb-6 h-24"
             />
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setIsRemoveModalVisible(false)}
-                className="flex-1 items-center rounded-xl bg-gray-800 p-4">
-                <Text className="text-lg text-white">Cancel</Text>
+                className="btn btn-ghost flex-1">
+                <Text className="text-sm font-semibold text-slate-200">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleFinalDelete}
-                className="flex-1 items-center rounded-xl bg-red-600 p-4">
-                <Text className="text-lg font-bold text-white">Confirm</Text>
+                className="btn flex-1 border border-rose-500/40 bg-rose-500/90 active:bg-rose-600">
+                <Text className="text-sm font-semibold text-white">Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -474,27 +614,33 @@ export const VoterSection = ({
           setIsPasswordReset(false);
         }}>
         <View className="flex-1 items-center justify-center bg-black/80 p-6">
-          <View className="w-full rounded-3xl border border-gray-800 bg-[#1e1e1e] p-6">
-            <Text className="mb-4 text-center text-3xl font-bold text-white">
-              {voterToReset?.name}
-            </Text>
-            <Text className="mb-1 text-center text-lg text-gray-400">
-              ID: {voterToReset?.student_id}
-            </Text>
-            <Text className="mb-1 text-center text-lg text-gray-400">
-              Email: {voterToReset?.email}
-            </Text>
-            <View
-              className={`mx-auto mb-6 mt-2 rounded-full px-4 py-1 ${voterToReset?.has_voted ? 'bg-green-500/20' : 'bg-yellow-500/10'}`}>
-              <Text
-                className={`text-base font-bold ${voterToReset?.has_voted ? 'text-green-500' : 'text-yellow-600'}`}>
-                {voterToReset?.has_voted ? 'VOTED' : 'PENDING'}
+          <View className="card w-full !rounded-3xl border-white/[0.1] p-6">
+            <View className="mb-4 items-center">
+              <View className="mb-3 h-14 w-14 items-center justify-center rounded-2xl border border-primary-500/30 bg-primary-500/15">
+                <Ionicons name="person-outline" size={24} color="#a5b4fc" />
+              </View>
+              <Text className="text-lg font-semibold text-white">{voterToReset?.name}</Text>
+              <Text className="text-xs text-slate-500">
+                ID: {voterToReset?.student_id} • {voterToReset?.email}
               </Text>
+              <View
+                className={`mt-3 rounded-full border px-3 py-1 ${
+                  voterToReset?.has_voted
+                    ? 'border-emerald-500/25 bg-emerald-500/10'
+                    : 'border-amber-500/25 bg-amber-500/10'
+                }`}>
+                <Text
+                  className={`text-[11px] font-bold uppercase tracking-eyebrow ${
+                    voterToReset?.has_voted ? 'text-emerald-300' : 'text-amber-300'
+                  }`}>
+                  {voterToReset?.has_voted ? 'Voted' : 'Pending'}
+                </Text>
+              </View>
             </View>
 
             {!isPasswordReset ? (
               <>
-                <Text className="mb-4 text-base text-gray-500">
+                <Text className="mb-5 text-center text-sm text-slate-400">
                   Generate a new password. The old password will be invalidated.
                 </Text>
 
@@ -506,13 +652,21 @@ export const VoterSection = ({
                       setNewResetPassword('');
                       setIsPasswordReset(false);
                     }}
-                    className="flex-1 items-center rounded-xl bg-gray-800 p-4">
-                    <Text className="text-lg text-white">Close</Text>
+                    className="btn btn-ghost flex-1">
+                    <Text className="text-sm font-semibold text-slate-200">Close</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={generateAndResetPassword}
-                    className="flex-1 items-center rounded-xl bg-[#f1c40f] p-4">
-                    <Text className="text-lg font-bold text-black">Reset</Text>
+                    disabled={isProcessing}
+                    className="btn btn-primary flex-1">
+                    {isProcessing ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="refresh-outline" size={16} color="#fff" />
+                        <Text className="ml-1.5 text-sm font-semibold text-white">Reset</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity
@@ -521,44 +675,47 @@ export const VoterSection = ({
                     setVoterToRemove(voterToReset);
                     setIsRemoveModalVisible(true);
                   }}
-                  className="mt-3 items-center rounded-xl border border-red-500 bg-red-500/10 p-4">
-                  <Text className="text-lg font-bold text-red-500">Remove Voter</Text>
+                  className="btn btn-danger mt-3">
+                  <Ionicons name="trash-outline" size={16} color="#fb7185" />
+                  <Text className="ml-1.5 text-sm font-semibold text-rose-300">Remove Voter</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 {/* Password Generated View - After Reset */}
-                <Text className="mb-2 text-2xl font-bold text-white">Password Reset!</Text>
-                <Text className="mb-4 text-base text-gray-500">
-                  Password for <Text className="font-bold text-white">{voterToReset?.name}</Text>{' '}
-                  has been reset successfully.
+                <View className="mb-2 flex-row items-center justify-center">
+                  <Ionicons name="checkmark-circle" size={18} color="#34d399" />
+                  <Text className="ml-2 text-base font-semibold text-white">Password reset!</Text>
+                </View>
+                <Text className="mb-4 text-center text-sm text-slate-400">
+                  Share this new password with{' '}
+                  <Text className="font-semibold text-white">{voterToReset?.name}</Text>.
                 </Text>
 
                 {/* Generated Password Display */}
-                <View className="mb-4 rounded-xl border border-gray-800 bg-[#121212] p-4">
+                <View className="mb-5 rounded-xl border border-accent-400/25 bg-accent-400/[0.06] p-4">
                   <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-base font-bold uppercase text-gray-500">
+                    <Text className="text-[11px] font-semibold uppercase tracking-eyebrow text-accent-400">
                       New Password
                     </Text>
                     <TouchableOpacity
-                      onPress={() => {
-                        Clipboard.setString(newResetPassword);
-                        Platform.OS === 'web'
-                          ? alert('Password copied to clipboard!')
-                          : Alert.alert('Copied', 'Password copied to clipboard!');
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(newResetPassword);
+                        if (Platform.OS === 'web') {
+                          alert('Password copied to clipboard!');
+                        } else {
+                          Alert.alert('Copied', 'Password copied to clipboard!');
+                        }
                       }}
-                      className="rounded bg-[#f1c40f]/20 px-3 py-1">
-                      <Text className="text-base font-bold text-[#f1c40f]">COPY</Text>
+                      className="flex-row items-center rounded-lg border border-accent-400/30 bg-accent-400/10 px-2.5 py-1">
+                      <Ionicons name="copy-outline" size={13} color="#fbbf24" />
+                      <Text className="ml-1 text-xs font-bold text-accent-400">COPY</Text>
                     </TouchableOpacity>
                   </View>
-                  <Text className="text-center text-2xl font-bold tracking-widest text-[#f1c40f]">
+                  <Text className="text-center font-mono text-xl font-semibold tracking-widest text-accent-400">
                     {newResetPassword}
                   </Text>
                 </View>
-
-                <Text className="mb-6 text-base text-gray-500">
-                  Make sure to share this new password with the student.
-                </Text>
 
                 <TouchableOpacity
                   onPress={() => {
@@ -567,8 +724,8 @@ export const VoterSection = ({
                     setNewResetPassword('');
                     setIsPasswordReset(false);
                   }}
-                  className="items-center rounded-xl bg-gray-800 p-4">
-                  <Text className="text-lg text-white">Close</Text>
+                  className="btn btn-ghost">
+                  <Text className="text-sm font-semibold text-slate-200">Close</Text>
                 </TouchableOpacity>
               </>
             )}

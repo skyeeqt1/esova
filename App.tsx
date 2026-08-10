@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { BackHandler, Alert } from 'react-native';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { BackHandler, Alert, StatusBar } from 'react-native';
+import { NavigationContainer, DefaultTheme, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
@@ -10,6 +10,20 @@ import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import './global.css';
 
 const Stack = createNativeStackNavigator();
+
+const navTheme = {
+  ...DefaultTheme,
+  dark: true,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#a78bfa',
+    background: '#06090f',
+    card: '#06090f',
+    text: '#ffffff',
+    border: 'rgba(255,255,255,0.08)',
+    notification: '#8b5cf6',
+  },
+};
 
 function BackButtonHandler() {
   const navigation = useNavigation();
@@ -42,7 +56,8 @@ function BackButtonHandler() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <StatusBar barStyle="light-content" backgroundColor="#06090f" />
+      <NavigationContainer theme={navTheme}>
         <BackButtonHandler />
         <Stack.Navigator
           screenOptions={{
