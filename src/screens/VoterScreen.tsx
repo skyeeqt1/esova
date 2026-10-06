@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   BackHandler,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,13 +20,15 @@ const DEFAULT_POSITIONS = ['President', 'VP', 'Secretary', 'Treasurer'];
 const DEFAULT_AVATAR = 'https://via.placeholder.com/150';
 
 const VoterScreen = ({ navigation, route }: any) => {
+  // Voter data is passed once via navigation params when the screen mounts
+  const voterData = route.params?.voterData;
   const [candidates, setCandidates] = useState<any[]>([]);
   const [positions, setPositions] = useState<string[]>(DEFAULT_POSITIONS);
   const [activeTab, setActiveTab] = useState('President');
-  const [selectedVotes, setSelectedVotes] = useState<any>({});
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
+  const [selectedVotes, setSelectedVotes] = useState<any>(voterData?.ballot ?? {});
+  const [step, setStep] = useState(voterData?.has_voted ? 3 : 1);
+  const [loading, setLoading] = useState(!voterData);
+  const [userData, setUserData] = useState<any>(voterData ?? null);
   const [viewingCandidate, setViewingCandidate] = useState<any>(null);
   const [showReceiptOverride, setShowReceiptOverride] = useState(false);
   const [electionSettings, setElectionSettings] = useState<any>(null);
@@ -34,35 +37,7 @@ const VoterScreen = ({ navigation, route }: any) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const submittingRef = useRef(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const unsubscribe = subscribeToData();
-
-    // Get voter data from navigation params (passed from LoginScreen)
-    const voterData = route.params?.voterData;
-
-    if (voterData) {
-      setUserData(voterData);
-      if (voterData.has_voted) {
-        setStep(3);
-        if (voterData.ballot) setSelectedVotes(voterData.ballot);
-      }
-      setLoading(false);
-    } else {
-      // Fallback: try to get from Supabase Auth (for admin users)
-      checkAuthUser().finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    }
-
-    return () => {
-      isMounted = false;
-      if (typeof unsubscribe === 'function') unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { height: windowHeight } = useWindowDimensions();
 
   const checkAuthUser = async () => {
     try {
@@ -192,6 +167,26 @@ const VoterScreen = ({ navigation, route }: any) => {
     }
   };
 
+  // Initial load: subscribe to realtime updates and resolve the signed-in user
+  useEffect(() => {
+    let isMounted = true;
+
+    const unsubscribe = subscribeToData();
+
+    if (!route.params?.voterData) {
+      // Fallback: try to get from Supabase Auth (for admin users)
+      checkAuthUser().finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    }
+
+    return () => {
+      isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Handle back button to close modal instead of going back
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -224,6 +219,8 @@ const VoterScreen = ({ navigation, route }: any) => {
 
   const isStarted = electionSettings?.status === 'started';
   const endTime = electionSettings?.end_time ? new Date(electionSettings.end_time).getTime() : 0;
+  // Time-based check — re-renders every second via the countdown timer above
+  // eslint-disable-next-line react-hooks/purity
   const isEnded = endTime < Date.now();
 
   const handleLogout = () => {
@@ -503,7 +500,7 @@ const VoterScreen = ({ navigation, route }: any) => {
       <View className="flex-1">
         {/* HEADER BAR */}
         <View className="flex-row items-center justify-between border-b border-white/[0.06] bg-surface-900/95 px-5 pb-4 pt-12">
-          <View className="flex-row items-center">
+          <View className="flex-shrink flex-row items-center">
             <View className="mr-2.5 h-10 w-10 items-center justify-center rounded-xl border border-violet-500/40 bg-surface-800">
               <Image
                 source={require('../assets/logo.png')}
@@ -511,33 +508,47 @@ const VoterScreen = ({ navigation, route }: any) => {
                 resizeMode="contain"
               />
             </View>
-            <View>
+            <View className="flex-shrink">
               <Text className="text-base font-bold tracking-tight text-white">E-SOVA</Text>
               <Text className="eyebrow">Voting Portal</Text>
             </View>
           </View>
 
-          <View className="items-center rounded-xl border border-primary-500/25 bg-primary-500/10 px-3.5 py-1.5">
-            <Text className="text-[10px] font-semibold uppercase tracking-eyebrow text-slate-400">
-              {isEnded ? 'Session' : 'Time Left'}
-            </Text>
-            <Text
-              className={`font-mono text-sm font-semibold ${isEnded ? 'text-rose-300' : 'text-primary-300'}`}>
-              {timeLeft}
-            </Text>
-          </View>
+          {/* Status pill + logout, grouped on the right */}
+          <View className="flex-row items-center gap-2.5">
+            {isEnded ? (
+              <View className="flex-row items-center rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5">
+                <View className="mr-1.5 h-1.5 w-1.5 rounded-full bg-rose-400" />
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-rose-300">
+                  Session Closed
+                </Text>
+              </View>
+            ) : (
+              <View className="items-center rounded-xl border border-primary-500/25 bg-primary-500/10 px-3 py-1">
+                <Text className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                  Time Left
+                </Text>
+                <Text className="font-mono text-xs font-semibold text-primary-300">
+                  {timeLeft || '··:··'}
+                </Text>
+              </View>
+            )}
 
-          <TouchableOpacity
-            onPress={handleLogoutPress}
-            className="items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2.5 active:bg-rose-500/20">
-            <Ionicons name="log-out-outline" size={16} color="#fb7185" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleLogoutPress}
+              className="items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2.5 active:bg-rose-500/20">
+              <Ionicons name="log-out-outline" size={16} color="#fb7185" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView className="flex-1 px-4 pt-4">
           {/* LOGIC: IF ELECTION ENDED AND USER IS NOT VIEWING RECEIPT */}
           {isEnded && !showReceiptOverride ? (
-            <View>
+            // Vertically centered so short closed-state cards don't leave
+            // a large empty area below them (grows naturally when results
+            // are published and the list is long)
+            <View className="justify-center" style={{ minHeight: windowHeight * 0.6 }}>
               {electionSettings?.results_published ? (
                 /* OFFICIAL RESULTS PANEL - SHOWS ALL CANDIDATES WITH VOTES */
                 <View className="card mb-8 p-6">
