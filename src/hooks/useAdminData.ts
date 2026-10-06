@@ -42,47 +42,6 @@ export const useAdminData = (adminEmail: string = '') => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentAdminEmail] = useState(adminEmail);
 
-  useEffect(() => {
-    setIsLoading(true);
-
-    // Fetch voters
-    fetchVoters();
-
-    // Fetch candidates
-    fetchCandidates();
-
-    // Fetch admin logs
-    fetchLogs();
-
-    // Set up real-time subscriptions
-    const votersChannel = supabase
-      .channel('voters-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        fetchVoters();
-      })
-      .subscribe();
-
-    const candidatesChannel = supabase
-      .channel('candidates-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
-        fetchCandidates();
-      })
-      .subscribe();
-
-    const logsChannel = supabase
-      .channel('logs-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_logs' }, () => {
-        fetchLogs();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(votersChannel);
-      supabase.removeChannel(candidatesChannel);
-      supabase.removeChannel(logsChannel);
-    };
-  }, []);
-
   const fetchVoters = async () => {
     try {
       const { data, error } = await supabase.from('users').select('*').eq('role', 'voter');
@@ -121,6 +80,47 @@ export const useAdminData = (adminEmail: string = '') => {
       console.error('Error fetching logs:', error);
     }
   };
+
+  useEffect(() => {
+    // Async fetchers: state updates land after the network response resolves,
+    // never synchronously in the effect body
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchVoters();
+
+    // Fetch candidates
+    fetchCandidates();
+
+    // Fetch admin logs
+    fetchLogs();
+
+    // Set up real-time subscriptions
+    const votersChannel = supabase
+      .channel('voters-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchVoters();
+      })
+      .subscribe();
+
+    const candidatesChannel = supabase
+      .channel('candidates-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
+        fetchCandidates();
+      })
+      .subscribe();
+
+    const logsChannel = supabase
+      .channel('logs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_logs' }, () => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(votersChannel);
+      supabase.removeChannel(candidatesChannel);
+      supabase.removeChannel(logsChannel);
+    };
+  }, []);
 
   // Helper function to add admin log
   const addAdminLog = async (
