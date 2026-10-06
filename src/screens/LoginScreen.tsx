@@ -17,6 +17,25 @@ import { supabase } from '../config/supabase';
 import { verifyPassword } from '../utils/password';
 import GradientButton from '../components/GradientButton';
 
+const NETWORK_TIMEOUT_MS = 15000;
+
+/** Rejects if the network request doesn't settle in time, so the button
+ *  never stays stuck on a spinner when the connection hangs. */
+const withTimeout = <T,>(promise: PromiseLike<T>, ms: number = NETWORK_TIMEOUT_MS): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), ms);
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +64,8 @@ const LoginScreen = ({ navigation }: any) => {
     }
   }, [lockoutEndTime]);
 
+  // Time-based lockout check — refreshed every second by the countdown interval above
+  // eslint-disable-next-line react-hooks/purity
   const isLockedOut = lockoutEndTime !== null && lockoutEndTime > Date.now();
 
   const checkAdminUser = async (userEmail: string, password: string) => {
@@ -84,7 +105,7 @@ const LoginScreen = ({ navigation }: any) => {
       let adminCheck = null;
 
       if (isEmail) {
-        adminCheck = await checkAdminUser(userInput, password);
+        adminCheck = await withTimeout(checkAdminUser(userInput, password));
       }
 
       if (isEmail && adminCheck?.isAdmin) {
@@ -99,15 +120,15 @@ const LoginScreen = ({ navigation }: any) => {
       let userError = null;
 
       if (isEmail) {
-        const result = await supabase.from('users').select('*').eq('email', userInput).single();
+        const result = await withTimeout(
+          supabase.from('users').select('*').eq('email', userInput).single()
+        );
         userData = result.data;
         userError = result.error;
       } else {
-        const result = await supabase
-          .from('users')
-          .select('*')
-          .eq('student_id', userInput)
-          .single();
+        const result = await withTimeout(
+          supabase.from('users').select('*').eq('student_id', userInput).single()
+        );
         userData = result.data;
         userError = result.error;
       }
@@ -139,9 +160,17 @@ const LoginScreen = ({ navigation }: any) => {
       setLockoutEndTime(null);
 
       navigation.replace('VoterScreen', { voterData: userData });
-    } catch {
-      handleFailedAttempt();
-      Alert.alert('Error', 'Login failed. Please check your internet connection.');
+    } catch (error: any) {
+      if (error?.message === 'NETWORK_TIMEOUT') {
+        // Don't count network hangs as a failed login attempt
+        Alert.alert(
+          'Connection Timed Out',
+          'The server took too long to respond. Please check your internet connection and try again.'
+        );
+      } else {
+        handleFailedAttempt();
+        Alert.alert('Error', 'Login failed. Please check your internet connection.');
+      }
     } finally {
       setLoading(false);
     }
@@ -176,10 +205,15 @@ const LoginScreen = ({ navigation }: any) => {
         locations={[0, 0.45, 1]}
         className="absolute inset-0"
       />
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}>
           {/* Header Section */}
           <View className="items-center px-6 pb-8 pt-14">
             <View className="mb-5 h-24 w-24 items-center justify-center rounded-[30px] border border-white/[0.1] bg-surface-800">
@@ -291,8 +325,8 @@ const LoginScreen = ({ navigation }: any) => {
               </View>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

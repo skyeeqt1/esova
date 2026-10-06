@@ -34,7 +34,11 @@ const GradientButton = ({
   <TouchableOpacity
     onPress={onPress}
     disabled={disabled || loading}
-    activeOpacity={0.95}
+    delayPressIn={0}
+    activeOpacity={0.82}
+    accessibilityRole="button"
+    accessibilityState={{ disabled: disabled || loading, busy: loading }}
+    accessibilityLabel={label}
     className={`overflow-hidden rounded-2xl active:scale-[0.97] ${disabled ? 'opacity-60' : ''} ${className}`}>
     <LinearGradient
       colors={colors}
