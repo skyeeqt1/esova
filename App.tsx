@@ -1,3 +1,4 @@
+import './src/config/interop';
 import React, { useEffect } from 'react';
 import { BackHandler, Alert, StatusBar } from 'react-native';
 import { NavigationContainer, DefaultTheme, useNavigation } from '@react-navigation/native';
